@@ -49,10 +49,11 @@ async function main() {
   console.log("\n🎯 Creating sample campaign for testing...");
   try {
     const tx = await factory.createCampaign(
-      "Sample Campaign -  Sepolia",
+      "Sample Campaign -  Arb Sepolia",
       deployer.address,
       7 * 24 * 60 * 60, // 7 days
-      ethers.parseEther("1") // 1 ETH goal
+      ethers.parseEther("1"), // 1 ETH goal
+      [] // No milestones
     );
 
     const receipt = await tx.wait();
