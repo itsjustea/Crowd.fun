@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePublicClient, useWalletClient } from 'wagmi';
-import { parseEther } from 'viem';
+import { parseEther, decodeEventLog, formatEther } from 'viem';
 import type { Address } from 'viem';
-import { decodeEventLog } from 'viem';
 
 // Contract address from environment
 const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS || '') as Address;
@@ -117,19 +116,26 @@ const CROWDFUND_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'getMilestoneCount',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+  },
 ] as const;
 
 // Updated Campaign interface with proper Address type
 export interface Campaign {
-  address: Address;  // Changed from string to Address
+  address: Address;
   name: string;
-  beneficiary: Address;  // Changed from string to Address
+  beneficiary: Address;
   fundingCap: string;
   totalRaised: string;
   deadline: number;
   finalized: boolean;
   isSuccessful: boolean;
-  creator: Address;  // Changed from string to Address
+  creator: Address;
 }
 
 export function useCrowdfundFactory() {
@@ -271,74 +277,177 @@ export function useCrowdfundFactory() {
       throw new Error('Please connect your wallet');
     }
 
-    console.log('🚀 Creating campaign:', data);
-
-    // Create the campaign
-    const hash = await walletClient.writeContract({
-      address: FACTORY_ADDRESS,
-      abi: FACTORY_ABI,
-      functionName: 'createCampaign',
-      args: [
-        data.name,
-        data.beneficiary as Address,
-        BigInt(data.duration),
-        parseEther(data.fundingCap),
-      ],
-    });
-
-    console.log('📝 Transaction hash:', hash);
-    console.log('⏳ Waiting for confirmation...');
-
-    // Wait for transaction to be mined
-    const receipt = await publicClient!.waitForTransactionReceipt({ hash });
-    console.log('✅ Transaction confirmed!');
-
-    // Get campaign address from event logs
-    let campaignAddress: Address | undefined;
-
-    for (const log of receipt.logs) {
-      try {
-        const decoded = decodeEventLog({
-          abi: FACTORY_ABI,
-          data: log.data,
-          topics: log.topics,
-        });
-
-        if (decoded.eventName === 'CampaignCreated') {
-            campaignAddress = decoded.args.campaignAddress;
-            break;
-        }
-      } catch {
-        // Not the event we're looking for
-        continue;
-      }
+    if (!publicClient) {
+      throw new Error('Public client not available');
     }
 
-    if (!campaignAddress) {
-      throw new Error('Campaign created but address not found in events');
-    }
+    console.log('🚀 Creating campaign with data:', data);
 
-    // Add milestones if specified
+    // IMPORTANT: Add buffer time for milestones
+    // If milestones exist, add 5 minutes to duration to allow time for milestone transactions
+    let adjustedDuration = data.duration;
     if (data.milestones && data.milestones.length > 0) {
-      console.log('🎯 Adding', data.milestones.length, 'milestones...');
+      const bufferTime = 300; // 5 minutes in seconds
+      adjustedDuration = data.duration + bufferTime;
+      console.log('⏰ Adding 5 minute buffer for milestone transactions');
+      console.log('   Original duration:', data.duration, 'seconds');
+      console.log('   Adjusted duration:', adjustedDuration, 'seconds');
+    }
 
-      for (let i = 0; i < data.milestones.length; i++) {
-        const milestone = data.milestones[i];
-        console.log(`  ${i + 1}. ${milestone.description} - ${milestone.amount} ETH`);
-
-        const milestoneHash = await walletClient.writeContract({
-          address: campaignAddress,
-          abi: CROWDFUND_ABI,
-          functionName: 'addMilestone',
-          args: [milestone.description, parseEther(milestone.amount)],
-        });
-
-        await publicClient!.waitForTransactionReceipt({ hash: milestoneHash });
-        console.log(`  ✅ Milestone ${i + 1} added`);
+    // Validate milestone amounts
+    if (data.milestones && data.milestones.length > 0) {
+      const totalMilestoneAmount = data.milestones.reduce((sum, m) => sum + parseFloat(m.amount), 0);
+      const fundingCapFloat = parseFloat(data.fundingCap);
+      
+      console.log('📊 Milestone validation:');
+      console.log('  - Total milestones:', totalMilestoneAmount, 'ETH');
+      console.log('  - Funding cap:', fundingCapFloat, 'ETH');
+      
+      if (totalMilestoneAmount > fundingCapFloat) {
+        throw new Error(`Total milestone amount (${totalMilestoneAmount} ETH) exceeds funding cap (${fundingCapFloat} ETH)`);
       }
     }
 
-    return campaignAddress;
+    try {
+      // Step 1: Create the campaign
+      console.log('📝 Step 1: Creating campaign...');
+      console.log('  - Name:', data.name);
+      console.log('  - Beneficiary:', data.beneficiary);
+      console.log('  - Duration:', adjustedDuration, 'seconds');
+      console.log('  - Funding Cap:', data.fundingCap, 'ETH');
+
+      const fundingCapWei = parseEther(data.fundingCap);
+
+      const hash = await walletClient.writeContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: 'createCampaign',
+        args: [
+          data.name,
+          data.beneficiary as Address,
+          BigInt(adjustedDuration),
+          fundingCapWei,
+        ],
+      });
+
+      console.log('📝 Transaction hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      // Wait for transaction to be mined
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log('✅ Campaign creation confirmed!');
+
+      // Get campaign address from event logs
+      let campaignAddress: Address | undefined;
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: FACTORY_ABI,
+            data: log.data,
+            topics: log.topics,
+          });
+
+          if (decoded.eventName === 'CampaignCreated') {
+            campaignAddress = (decoded.args as any).campaignAddress;
+            console.log('📍 Campaign created at:', campaignAddress);
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (!campaignAddress) {
+        console.log('⚠️  Could not parse event, fetching from contract...');
+        const allCampaigns = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: 'getAllCampaigns',
+        }) as Address[];
+
+        if (allCampaigns.length > 0) {
+          campaignAddress = allCampaigns[allCampaigns.length - 1];
+          console.log('📍 Campaign address from contract:', campaignAddress);
+        } else {
+          throw new Error('Campaign created but address not found');
+        }
+      }
+
+      // Step 2: Add milestones if specified
+      if (data.milestones && data.milestones.length > 0) {
+        console.log('🎯 Step 2: Adding', data.milestones.length, 'milestones...');
+        console.log('⚡ Adding milestones immediately to avoid deadline issues');
+
+        for (let i = 0; i < data.milestones.length; i++) {
+          const milestone = data.milestones[i];
+          const milestoneAmountWei = parseEther(milestone.amount);
+          
+          console.log(`📌 Milestone ${i + 1}/${data.milestones.length}:`);
+          console.log(`   Description: ${milestone.description}`);
+          console.log(`   Amount: ${milestone.amount} ETH`);
+
+          try {
+            const milestoneHash = await walletClient.writeContract({
+              address: campaignAddress,
+              abi: CROWDFUND_ABI,
+              functionName: 'addMilestone',
+              args: [milestone.description, milestoneAmountWei],
+            });
+
+            console.log(`   Transaction: ${milestoneHash}`);
+            
+            const milestoneReceipt = await publicClient.waitForTransactionReceipt({ 
+              hash: milestoneHash,
+              timeout: 60_000, // 60 second timeout
+            });
+            
+            console.log(`   ✅ Milestone ${i + 1} added successfully`);
+          } catch (milestoneError: any) {
+            console.error(`   ❌ Error adding milestone ${i + 1}:`, milestoneError);
+            
+            // Check if it's a deadline error
+            if (milestoneError.message?.includes('Campaign has ended') || 
+                milestoneError.message?.includes('beforeDeadline')) {
+              throw new Error(`Milestone ${i + 1} failed: Campaign deadline passed. Try creating campaign with longer duration or fewer milestones.`);
+            }
+            
+            throw new Error(`Failed to add milestone ${i + 1}: ${milestoneError.shortMessage || milestoneError.message}`);
+          }
+        }
+
+        console.log('✅ All milestones added successfully!');
+      }
+
+      console.log('🎉 Campaign creation complete!');
+      return campaignAddress;
+      
+    } catch (error: any) {
+      console.error('❌ Error in createCampaign:', error);
+      
+      // Extract meaningful error message
+      let errorMessage = 'Failed to create campaign';
+      
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      if (error.shortMessage) {
+        errorMessage = error.shortMessage;
+      }
+      
+      // Check for common errors
+      if (errorMessage.includes('user rejected') || errorMessage.includes('User rejected')) {
+        errorMessage = 'Transaction rejected by user';
+      } else if (errorMessage.includes('insufficient funds')) {
+        errorMessage = 'Insufficient funds for gas fees';
+      } else if (errorMessage.includes('Campaign has ended') || errorMessage.includes('beforeDeadline')) {
+        errorMessage = 'Campaign deadline passed while adding milestones. Please use a longer duration (recommended: at least 1 hour for campaigns with milestones).';
+      }
+      
+      console.error('📛 Final error:', errorMessage);
+      throw new Error(errorMessage);
+    }
   };
 
   const refreshCampaigns = async () => {
