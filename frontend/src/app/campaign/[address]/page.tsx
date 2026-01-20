@@ -672,18 +672,34 @@ export default function CampaignPage() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-white/50 mb-1">Creator</p>
-                  <p className="text-white font-mono text-sm break-all">{campaign.creator}</p>
+                  <a
+                    href={`https://sepolia.arbiscan.io/address/${campaign.creator}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
+                  >
+                    {campaign.creator}
+                    <span className="text-xs flex-shrink-0">↗</span>
+                  </a>
                 </div>
                 
                 <div>
                   <p className="text-sm text-white/50 mb-1">Beneficiary</p>
-                  <p className="text-white font-mono text-sm break-all">{campaign.beneficiary}</p>
+                  <a
+                    href={`https://sepolia.arbiscan.io/address/${campaign.beneficiary}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
+                  >
+                    {campaign.beneficiary}
+                    <span className="text-xs flex-shrink-0">↗</span>
+                  </a>
                 </div>
                 
                 <div>
                   <p className="text-sm text-white/50 mb-1">Contract Address</p>
                   <a
-                    href={`https://sepolia.etherscan.io/address/${campaignAddress}`}
+                    href={`https://sepolia.arbiscan.io/address/${campaignAddress}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
