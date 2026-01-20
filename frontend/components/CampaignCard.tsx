@@ -1,32 +1,47 @@
 'use client';
 
 import { useState } from 'react';
-import { ethers } from 'ethers';
+import { parseEther } from 'viem';
+import type { Address } from 'viem';
 import Link from 'next/link';
+import { useWalletClient, usePublicClient } from 'wagmi';
 
 interface Campaign {
-  address: string;
+  address: Address;
   name: string;
-  beneficiary: string;
+  beneficiary: Address;
   fundingCap: string;
   totalRaised: string;
   deadline: number;
   finalized: boolean;
   isSuccessful: boolean;
-  creator: string;
+  creator: Address;
 }
 
 interface CampaignCardProps {
   campaign: Campaign;
-  account: string | null;
+  account: Address | null | undefined;
 }
+
+const CROWDFUND_ABI = [
+  {
+    type: 'function',
+    name: 'contribute',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+] as const;
 
 export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const [isContributing, setIsContributing] = useState(false);
   const [contributionAmount, setContributionAmount] = useState('');
 
-  const raised = parseFloat(ethers.formatEther(campaign.totalRaised));
-  const goal = parseFloat(ethers.formatEther(campaign.fundingCap));
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+
+  const raised = parseFloat(parseFloat(campaign.totalRaised) / 1e18 + '');
+  const goal = parseFloat(parseFloat(campaign.fundingCap) / 1e18 + '');
   const progress = (raised / goal) * 100;
 
   const timeRemaining = campaign.deadline * 1000 - Date.now();
@@ -41,33 +56,36 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
       return;
     }
 
+    if (!walletClient || !publicClient) {
+      alert('Please connect your wallet');
+      return;
+    }
+
     try {
       setIsContributing(true);
 
-      if (typeof window.ethereum === 'undefined') {
-        alert('Please install MetaMask');
-        return;
-      }
+      console.log('💰 Contributing', contributionAmount, 'ETH to', campaign.address);
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-
-      const crowdfundABI = [
-        'function contribute() external payable',
-      ];
-
-      const contract = new ethers.Contract(campaign.address, crowdfundABI, signer);
-
-      const tx = await contract.contribute({
-        value: ethers.parseEther(contributionAmount),
+      const hash = await walletClient.writeContract({
+        address: campaign.address,
+        abi: CROWDFUND_ABI,
+        functionName: 'contribute',
+        value: parseEther(contributionAmount),
       });
 
-      await tx.wait();
+      console.log('📝 Transaction hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
+      console.log('✅ Contribution successful!');
       alert('Contribution successful!');
       setContributionAmount('');
+      
+      // Reload page to refresh campaign data
       window.location.reload();
     } catch (error: any) {
-      console.error('Contribution error:', error);
+      console.error('❌ Contribution error:', error);
       alert(error.message || 'Failed to contribute');
     } finally {
       setIsContributing(false);

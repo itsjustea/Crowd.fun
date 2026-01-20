@@ -6,41 +6,13 @@ import CampaignCard from '@/components/CampaignCard';
 import CreateCampaignModal from '@/components/CreateCampaignModal';
 import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
+
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { campaigns, loading, createCampaign, refreshCampaigns } = useCrowdfundFactory();
-  const [account, setAccount] = useState<string | null>(null);
-
-  useEffect(() => {
-    checkWalletConnection();
-  }, []);
-
-  const checkWalletConnection = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          setAccount(accounts[0]);
-        }
-      } catch (error) {
-        console.error('Error checking wallet connection:', error);
-      }
-    }
-  };
-
-  const connectWallet = async () => {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        setAccount(accounts[0]);
-      } catch (error) {
-        console.error('Error connecting wallet:', error);
-      }
-    } else {
-      alert('Please install MetaMask to use this dApp');
-    }
-  };
+  const { address, isConnected } = useAccount();
 
   const handleCreateCampaign = async (data: {
     name: string;
@@ -75,22 +47,15 @@ export default function Home() {
             </span>
             <span className="text-white">.Fun</span>
           </h1>
-
-          {account ? (
-            <div className="flex items-center gap-3 px-5 py-3 bg-white/5 border border-white/10 rounded-xl backdrop-blur-md">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-              <span className="font-mono text-sm text-white/90 font-medium">
-                {account.slice(0, 6)}...{account.slice(-4)}
-              </span>
-            </div>
-          ) : (
-            <button
-              onClick={connectWallet}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200"
-            >
-              Connect Wallet
-            </button>
-          )}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: 12,
+            }}
+          >
+            <ConnectButton />
+          </div>
         </div>
       </header>
 
@@ -113,7 +78,7 @@ export default function Home() {
             Full transparency. Zero trust required.
           </p>
 
-          {account && (
+          {isConnected && (
             <button
               onClick={() => setIsModalOpen(true)}
               className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg rounded-2xl shadow-[0_10px_40px_rgba(99,102,241,0.3),inset_0_-2px_10px_rgba(0,0,0,0.2)] hover:shadow-[0_15px_50px_rgba(99,102,241,0.4)] hover:-translate-y-1 hover:scale-[1.02] transition-all duration-300 animate-fade-in-up animation-delay-200"
@@ -147,7 +112,7 @@ export default function Home() {
                 No campaigns yet
               </h4>
               <p className="text-white/50">
-                {account
+                {isConnected
                   ? "Be the first to launch a campaign!"
                   : "Connect your wallet to get started"
                 }
@@ -159,7 +124,7 @@ export default function Home() {
                 <CampaignCard
                   key={campaign.address}
                   campaign={campaign}
-                  account={account}
+                  account={address || null}
                 />
               ))}
             </div>
