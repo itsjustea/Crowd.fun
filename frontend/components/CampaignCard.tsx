@@ -33,6 +33,8 @@ const CROWDFUND_ABI = [
   },
 ] as const;
 
+type CampaignStatus = 'Active' | 'Fully-Funded' | 'Ended' | 'Finalized';
+
 export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const [isContributing, setIsContributing] = useState(false);
   const [contributionAmount, setContributionAmount] = useState('');
@@ -44,9 +46,31 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const goal = parseFloat(parseFloat(campaign.fundingCap) / 1e18 + '');
   const progress = (raised / goal) * 100;
 
+  
+
+  // Calculate time remaining
+  const now = Math.floor(Date.now() / 1000);
+  const deadlineTimestamp = campaign.deadline;
+  const isExpired = now > deadlineTimestamp;
   const timeRemaining = campaign.deadline * 1000 - Date.now();
   const daysLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60 * 24)));
+  const hoursLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60)));
 
+  const isFullyFunded = campaign.totalRaised >= campaign.fundingCap;
+
+  let status: CampaignStatus;
+  if (campaign.finalized) {
+    status = 'Finalized';
+  } else if (isFullyFunded) {
+    status = 'Fully-Funded';
+  } else if (isExpired) {
+    status = 'Ended';
+  } else {
+    status = 'Active';
+  }
+
+  const canContribute = status === 'Active';
+  
   const isActive = !campaign.finalized && timeRemaining > 0;
   const isCreator = account?.toLowerCase() === campaign.creator?.toLowerCase();
 
@@ -92,6 +116,36 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
     }
   };
 
+  // Status badge configuration
+  const statusConfig = {
+    'Active': {
+      bg: 'bg-emerald-500/15',
+      border: 'border-emerald-500/30',
+      text: 'text-emerald-400',
+      label: daysLeft > 0 ? `${daysLeft} days left` : `${hoursLeft} hours left`,
+    },
+    'Fully-Funded': {
+      bg: 'bg-green-500/15',
+      border: 'border-green-500/30',
+      text: 'text-green-400',
+      label: 'Fully Funded',
+    },
+    'Ended': {
+      bg: 'bg-red-500/15',
+      border: 'border-red-500/30',
+      text: 'text-red-400',
+      label: 'Ended',
+    },
+    'Finalized': {
+      bg: 'bg-purple-500/15',
+      border: 'border-purple-500/30',
+      text: 'text-purple-400',
+      label: 'Finalized',
+    },
+  };
+
+  const currentStatus = statusConfig[status];
+  
   return (
     <div className="group relative bg-white/[0.03] border border-white/10 rounded-3xl p-7 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-indigo-500/30 hover:shadow-[0_10px_40px_rgba(99,102,241,0.15)] overflow-hidden">
       {/* Top Border Gradient */}
@@ -99,15 +153,9 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        {isActive ? (
-          <div className="px-3.5 py-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full text-emerald-400 text-xs font-semibold uppercase tracking-wide">
-            {daysLeft} days left
-          </div>
-        ) : (
-          <div className="px-3.5 py-1.5 bg-red-500/15 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold uppercase tracking-wide">
-            {campaign.finalized ? 'Finalized' : 'Ended'}
-          </div>
-        )}
+        <div className={`px-3.5 py-1.5 ${currentStatus.bg} border ${currentStatus.border} rounded-full ${currentStatus.text} text-xs font-semibold uppercase tracking-wide`}>
+          {currentStatus.label}
+        </div>
 
         {isCreator && (
           <div className="px-3.5 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold uppercase tracking-wide">
@@ -162,8 +210,8 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
         </span>
       </div>
 
-      {/* Contribute Section */}
-      {isActive && account && !isCreator && (
+      {/* Action Section */}
+      {canContribute && account && !isCreator ? (
         <div className="flex gap-3">
           <input
             type="number"
@@ -182,10 +230,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
             {isContributing ? 'Contributing...' : 'Contribute'}
           </button>
         </div>
-      )}
-
-      {/* View Details Button */}
-      {!isActive && (
+      ) : (
         <Link
           href={`/campaign/${campaign.address}`}
           className="block w-full px-4 py-3 text-center bg-white/5 border border-white/10 rounded-xl text-white/80 font-semibold hover:bg-white/8 hover:border-indigo-500/30 transition-all"
