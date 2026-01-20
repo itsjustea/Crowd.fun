@@ -29,6 +29,11 @@ contract Crowdfund {
         bool fundsReleased;
     }
     
+    struct MilestoneInput {
+        string description;
+        uint256 amount;
+    }
+    
     Milestone[] public milestones;
     uint256 public totalMilestoneAmount;
     uint256 public releasedAmount;
@@ -81,7 +86,8 @@ contract Crowdfund {
         address _beneficiary,
         uint256 _duration,
         uint256 _fundingCap,
-        address _creator
+        address _creator,
+        Milestone[] memory _milestones
     ) {
         require(_beneficiary != address(0), "Invalid beneficiary address");
         require(_duration > 0, "Duration must be greater than 0");
@@ -95,6 +101,18 @@ contract Crowdfund {
         finalized = false;
         totalFundsRaised = 0;
         releasedAmount = 0;
+
+        // initialise milestones if any
+        if (_milestones.length > 0) {
+            for (uint256 i = 0; i < _milestones.length; i++) {
+                milestones.push(Milestone({
+                    description: _milestones[i].description,
+                    amount: _milestones[i].amount,
+                    completed: false,
+                    fundsReleased: false
+                }));
+            }
+        }
     }
     
     /**
@@ -102,21 +120,21 @@ contract Crowdfund {
      * @param _description Description of the milestone
      * @param _amount Amount to be released when milestone is completed
      */
-    function addMilestone(string memory _description, uint256 _amount) external onlyCreator beforeDeadline {
-        require(_amount > 0, "Milestone amount must be greater than 0");
-        require(totalMilestoneAmount + _amount <= fundingCap, "Total milestone amount exceeds funding cap");
+    // function addMilestone(string memory _description, uint256 _amount) external onlyCreator beforeDeadline {
+    //     require(_amount > 0, "Milestone amount must be greater than 0");
+    //     require(totalMilestoneAmount + _amount <= fundingCap, "Total milestone amount exceeds funding cap");
         
-        milestones.push(Milestone({
-            description: _description,
-            amount: _amount,
-            completed: false,
-            fundsReleased: false
-        }));
+    //     milestones.push(Milestone({
+    //         description: _description,
+    //         amount: _amount,
+    //         completed: false,
+    //         fundsReleased: false
+    //     }));
         
-        totalMilestoneAmount += _amount;
+    //     totalMilestoneAmount += _amount;
         
-        emit MilestoneAdded(milestones.length - 1, _description, _amount);
-    }
+    //     emit MilestoneAdded(milestones.length - 1, _description, _amount);
+    // }
     
     /**
      * @dev Contribute to the crowdfund campaign

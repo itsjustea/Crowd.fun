@@ -39,7 +39,8 @@ contract CrowdfundFactory {
         string memory _name,
         address _beneficiary,
         uint256 _duration,
-        uint256 _fundingCap
+        uint256 _fundingCap,
+        Crowdfund.Milestone[] memory _milestones
     ) external returns (address) {
         // Deploy new Crowdfund contract
         Crowdfund newCampaign = new Crowdfund(
@@ -47,7 +48,8 @@ contract CrowdfundFactory {
             _beneficiary,
             _duration,
             _fundingCap,
-            msg.sender
+            msg.sender,
+            _milestones
         );
         
         address campaignAddress = address(newCampaign);
