@@ -153,9 +153,15 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        <div className={`px-3.5 py-1.5 ${currentStatus.bg} border ${currentStatus.border} rounded-full ${currentStatus.text} text-xs font-semibold uppercase tracking-wide`}>
-          {currentStatus.label}
-        </div>
+        {isActive ? (
+          <div className="px-3.5 py-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full text-emerald-400 text-xs font-semibold uppercase tracking-wide">
+            {daysLeft} days left
+          </div>
+        ) : (
+          <div className="px-3.5 py-1.5 bg-red-500/15 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold uppercase tracking-wide">
+            {campaign.finalized ? 'Finalized' : 'Ended'}
+          </div>
+        )}
 
         {isCreator && (
           <div className="px-3.5 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold uppercase tracking-wide">
@@ -210,8 +216,8 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
         </span>
       </div>
 
-      {/* Action Section */}
-      {canContribute && account && !isCreator ? (
+      {/* Contribute Section */}
+      {isActive && account && !isCreator && (
         <div className="flex gap-3">
           <input
             type="number"
@@ -223,14 +229,28 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
             className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 font-mono focus:outline-none focus:border-indigo-500/50 focus:bg-white/8 focus:ring-3 focus:ring-indigo-500/10 transition-all"
           />
           <button
-            onClick={handleContribute}
-            disabled={isContributing}
-            className="px-7 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            {isContributing ? 'Contributing...' : 'Contribute'}
-          </button>
+  onClick={handleContribute}
+  disabled={isContributing}
+  className="
+    shrink-0
+    px-5 py-2.5
+    text-sm font-semibold text-white
+    bg-gradient-to-r from-indigo-600 to-purple-600
+    rounded-xl whitespace-nowrap
+    hover:-translate-y-0.5
+    hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)]
+    transition-all duration-200
+    disabled:opacity-50 disabled:cursor-not-allowed
+  "
+>
+  {isContributing ? 'Contributing...' : 'Contribute'}
+</button>
+
         </div>
-      ) : (
+      )}
+
+      {/* View Details Button */}
+      {!isActive && (
         <Link
           href={`/campaign/${campaign.address}`}
           className="block w-full px-4 py-3 text-center bg-white/5 border border-white/10 rounded-xl text-white/80 font-semibold hover:bg-white/8 hover:border-indigo-500/30 transition-all"

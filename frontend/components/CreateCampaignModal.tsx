@@ -23,11 +23,11 @@ interface CreateCampaignModalProps {
 type DurationUnit = 'minutes' | 'hours' | 'days';
 
 export default function CreateCampaignModal({ isOpen, onClose, onSubmit }: CreateCampaignModalProps) {
-    const [name, setName] = useState('');
+    const [name, setName] = useState('test');
     const [beneficiary, setBeneficiary] = useState('');
-    const [durationValue, setDurationValue] = useState('7');
-    const [durationUnit, setDurationUnit] = useState<DurationUnit>('days');
-    const [fundingCap, setFundingCap] = useState('');
+    const [durationValue, setDurationValue] = useState('1');
+    const [durationUnit, setDurationUnit] = useState<DurationUnit>('hours');
+    const [fundingCap, setFundingCap] = useState('0.02');
     const [useMilestones, setUseMilestones] = useState(false);
     const [milestones, setMilestones] = useState<Milestone[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -170,7 +170,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onSubmit }: Creat
                 beneficiary: beneficiary.trim(),
                 duration: durationInSeconds,
                 fundingCap,
-                milestones: useMilestones && milestones.length > 0 ? milestones : undefined,
+                milestones: useMilestones && milestones.length > 0 ? milestones : [],
             });
 
             // Reset form
@@ -193,14 +193,6 @@ export default function CreateCampaignModal({ isOpen, onClose, onSubmit }: Creat
             setBeneficiary(address);
         }
     };
-
-
-    // Quick duration presets
-    const setQuickDuration = (value: number, unit: DurationUnit) => {
-        setDurationValue(value.toString());
-        setDurationUnit(unit);
-    };
-
     
   return (
     <div
