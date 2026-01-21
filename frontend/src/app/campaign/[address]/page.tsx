@@ -278,27 +278,6 @@ export default function CampaignPage() {
     }
   };
 
-  // const handleFinalize = async () => {
-  //   if (!walletClient || !publicClient) return;
-
-  //   try {
-  //     setIsProcessing(true);
-  //     const hash = await walletClient.writeContract({
-  //       address: campaignAddress,
-  //       abi: CROWDFUND_ABI,
-  //       functionName: 'finalize',
-  //     });
-
-  //     await publicClient.waitForTransactionReceipt({ hash });
-  //     alert('Campaign finalized successfully!');
-  //     await fetchCampaign();
-  //   } catch (error: any) {
-  //     console.error('❌ Finalize error:', error);
-  //     alert(error.shortMessage || 'Failed to finalize campaign');
-  //   } finally {
-  //     setIsProcessing(false);
-  //   }
-  // };
   const handleFinalize = async () => {
     if (!walletClient || !publicClient || !campaign) return;
 
@@ -509,25 +488,187 @@ export default function CampaignPage() {
     }
   };
 
+  // const handleClaimRefund = async () => {
+  //   if (!walletClient || !publicClient) return;
+
+  //   try {
+  //     setIsProcessing(true);
+  //     const hash = await walletClient.writeContract({
+  //       address: campaignAddress,
+  //       abi: CROWDFUND_ABI,
+  //       functionName: 'claimRefund',
+  //     });
+
+  //     await publicClient.waitForTransactionReceipt({ hash });
+  //     alert('Refund claimed successfully!');
+  //     await fetchCampaign();
+  //   } catch (error: any) {
+  //     console.error('❌ Claim refund error:', error);
+  //     alert(error.shortMessage || 'Failed to claim refund');
+  //   } finally {
+  //     setIsProcessing(false);
+  //   }
+  // };
   const handleClaimRefund = async () => {
-    if (!walletClient || !publicClient) return;
+    if (!walletClient || !publicClient || !campaign || !account) return;
 
     try {
       setIsProcessing(true);
+      
+      console.log('═══════════════════════════════════════');
+      console.log('💰 CLAIMING REFUND');
+      console.log('═══════════════════════════════════════');
+      console.log('Campaign:', campaignAddress);
+      console.log('Your address:', account);
+      
+      // Get fresh data from contract
+      console.log('🔍 Checking current state...');
+      
+      const [currentFinalized, currentIsSuccessful, yourContribution] = await Promise.all([
+        publicClient.readContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'finalized',
+        }),
+        publicClient.readContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'isSuccessful',
+        }),
+        publicClient.readContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'contributions',
+          args: [account],
+        }),
+      ]);
+      
+      console.log('📊 Current State:');
+      console.log('   Campaign finalized:', currentFinalized);
+      console.log('   Campaign successful:', currentIsSuccessful);
+      console.log('   Your contribution:', formatEther(yourContribution as bigint), 'ETH');
+      
+      // Validation checks
+      if (!currentFinalized) {
+        alert('Cannot claim refund: Campaign has not been finalized yet.\n\nThe creator must finalize the campaign first.');
+        return;
+      }
+      
+      if (currentIsSuccessful) {
+        alert('Cannot claim refund: Campaign was successful!\n\nNo refunds are available for successful campaigns.');
+        return;
+      }
+      
+      if (yourContribution === BigInt(0)) {
+        alert('Cannot claim refund: You have no contribution to refund.\n\nYou either:\n• Never contributed to this campaign\n• Already claimed your refund');
+        return;
+      }
+      
+      const refundAmount = formatEther(yourContribution as bigint);
+      console.log('✅ Eligible for refund:', refundAmount, 'ETH');
+      
+      // Confirm with user
+      const confirmRefund = confirm(
+        `Claim your refund?\n\n` +
+        `Amount: ${refundAmount} ETH\n\n` +
+        `This will be sent back to your wallet.`
+      );
+      
+      if (!confirmRefund) {
+        console.log('❌ User cancelled');
+        return;
+      }
+      
+      // Simulate first
+      console.log('🧪 Simulating refund claim...');
+      try {
+        await publicClient.simulateContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'claimRefund',
+          account: account,
+        });
+        console.log('✅ Simulation successful');
+      } catch (simError: any) {
+        console.error('❌ Simulation failed:', simError);
+        
+        let errorMsg = 'Cannot claim refund:\n\n';
+        if (simError.message?.includes('Campaign not finalized yet')) {
+          errorMsg += 'Campaign has not been finalized. Ask the creator to finalize it first.';
+        } else if (simError.message?.includes('Campaign was successful')) {
+          errorMsg += 'Campaign was successful. No refunds are available.';
+        } else if (simError.message?.includes('No contribution to refund')) {
+          errorMsg += 'You have no contribution to refund. You may have already claimed it.';
+        } else {
+          errorMsg += simError.shortMessage || simError.message || 'Unknown error';
+        }
+        
+        alert(errorMsg);
+        return;
+      }
+      
+      console.log('📤 Sending refund claim transaction...');
+      
       const hash = await walletClient.writeContract({
         address: campaignAddress,
         abi: CROWDFUND_ABI,
         functionName: 'claimRefund',
+        gas: undefined, // Explicit gas limit
       });
 
-      await publicClient.waitForTransactionReceipt({ hash });
-      alert('Refund claimed successfully!');
-      await fetchCampaign();
+      console.log('📝 Transaction hash:', hash);
+      console.log('⏳ Waiting for confirmation...');
+
+      const receipt = await publicClient.waitForTransactionReceipt({ 
+        hash,
+        timeout: 60_000,
+      });
+
+      console.log('✅ Transaction confirmed!');
+      console.log('   Status:', receipt.status);
+      console.log('   Gas used:', receipt.gasUsed.toString());
+      
+      if (receipt.status === 'success') {
+        console.log('✅ Refund claimed successfully!');
+        alert(`Refund claimed successfully! 🎉\n\n${refundAmount} ETH has been sent back to your wallet.`);
+        
+        // Refresh campaign data
+        await fetchCampaign();
+      } else {
+        console.error('❌ Transaction failed');
+        alert('Transaction was mined but failed. Please check the transaction on Etherscan.');
+      }
+      
     } catch (error: any) {
       console.error('❌ Claim refund error:', error);
-      alert(error.shortMessage || 'Failed to claim refund');
+      console.log('Error details:', {
+        message: error.message,
+        shortMessage: error.shortMessage,
+        cause: error.cause,
+      });
+      
+      let errorMsg = 'Failed to claim refund:\n\n';
+      
+      if (error.message?.includes('Campaign not finalized')) {
+        errorMsg += 'Campaign has not been finalized yet.';
+      } else if (error.message?.includes('Campaign was successful')) {
+        errorMsg += 'Campaign was successful. No refunds available.';
+      } else if (error.message?.includes('No contribution to refund')) {
+        errorMsg += 'You have no contribution to refund. You may have already claimed it.';
+      } else if (error.message?.includes('user rejected') || error.message?.includes('User rejected')) {
+        errorMsg = 'Transaction cancelled.';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMsg += 'Insufficient ETH for gas fees.';
+      } else if (error.message?.includes('Refund transfer failed')) {
+        errorMsg += 'The refund transfer failed. This might be a contract or network issue. Please try again.';
+      } else {
+        errorMsg += error.shortMessage || error.message || 'Unknown error';
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsProcessing(false);
+      console.log('═══════════════════════════════════════');
     }
   };
 

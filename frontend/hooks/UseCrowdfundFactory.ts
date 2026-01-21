@@ -6,7 +6,7 @@ import type { Address } from 'viem';
 // Contract address from environment
 const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS || '') as Address;
 
-// Factory ABI
+// Factory ABI - UPDATED to include milestones parameter
 const FACTORY_ABI = [
   {
     type: 'function',
@@ -15,7 +15,15 @@ const FACTORY_ABI = [
       { name: '_name', type: 'string' },
       { name: '_beneficiary', type: 'address' },
       { name: '_duration', type: 'uint256' },
-      { name: '_fundingCap', type: 'uint256' }
+      { name: '_fundingCap', type: 'uint256' },
+      {
+        name: '_milestones',
+        type: 'tuple[]',
+        components: [
+          { name: 'description', type: 'string' },
+          { name: 'amount', type: 'uint256' }
+        ]
+      }
     ],
     outputs: [{ type: 'address' }],
     stateMutability: 'nonpayable',
@@ -48,7 +56,7 @@ const FACTORY_ABI = [
   },
 ] as const;
 
-// Crowdfund ABI
+// Crowdfund ABI (unchanged)
 const CROWDFUND_ABI = [
   {
     type: 'function',
@@ -108,16 +116,6 @@ const CROWDFUND_ABI = [
   },
   {
     type: 'function',
-    name: 'addMilestone',
-    inputs: [
-      { name: '_description', type: 'string' },
-      { name: '_amount', type: 'uint256' }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
     name: 'getMilestoneCount',
     inputs: [],
     outputs: [{ type: 'uint256' }],
@@ -125,7 +123,6 @@ const CROWDFUND_ABI = [
   },
 ] as const;
 
-// Updated Campaign interface with proper Address type
 export interface Campaign {
   address: Address;
   name: string;
@@ -143,21 +140,18 @@ export function useCrowdfundFactory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Use Wagmi hooks
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
   const fetchCampaigns = async () => {
     if (!FACTORY_ADDRESS) {
       console.error('❌ Factory address not configured');
-      console.log('📝 Please set NEXT_PUBLIC_FACTORY_ADDRESS in your .env.local file');
       setError('Factory address not configured');
       setLoading(false);
       return;
     }
 
     if (!publicClient) {
-      console.error('❌ Public client not available');
       setLoading(false);
       return;
     }
@@ -167,7 +161,6 @@ export function useCrowdfundFactory() {
       setLoading(true);
       setError(null);
 
-      // Get all campaign addresses
       const campaignAddresses = await publicClient.readContract({
         address: FACTORY_ADDRESS,
         abi: FACTORY_ABI,
@@ -177,59 +170,23 @@ export function useCrowdfundFactory() {
       console.log('📊 Found', campaignAddresses.length, 'campaigns');
 
       if (campaignAddresses.length === 0) {
-        console.log('📦 No campaigns created yet');
         setCampaigns([]);
         setLoading(false);
         return;
       }
 
-      // Fetch details for each campaign
       const campaignData = await Promise.all(
         campaignAddresses.map(async (address) => {
           try {
-            console.log('📖 Reading campaign:', address);
-
             const [name, beneficiary, fundingCap, deadline, totalRaised, finalized, creator, isSuccessful] = await Promise.all([
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'name',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'beneficiary',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'fundingCap',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'deadline',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'totalFundsRaised',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'finalized',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'creator',
-              }),
-              publicClient.readContract({
-                address,
-                abi: CROWDFUND_ABI,
-                functionName: 'isSuccessful',
-              }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'name' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'beneficiary' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'fundingCap' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'deadline' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'totalFundsRaised' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'finalized' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'creator' }),
+              publicClient.readContract({ address, abi: CROWDFUND_ABI, functionName: 'isSuccessful' }),
             ]);
 
             return {
@@ -250,7 +207,6 @@ export function useCrowdfundFactory() {
         })
       );
 
-      // Filter out any failed fetches
       const validCampaigns = campaignData.filter((c): c is Campaign => c !== null);
       console.log('✅ Successfully loaded', validCampaigns.length, 'campaigns');
       setCampaigns(validCampaigns);
@@ -281,43 +237,80 @@ export function useCrowdfundFactory() {
       throw new Error('Public client not available');
     }
 
-    console.log('🚀 Creating campaign with data:', data);
-
-    // IMPORTANT: Add buffer time for milestones
-    // If milestones exist, add 5 minutes to duration to allow time for milestone transactions
-    let adjustedDuration = data.duration;
-    if (data.milestones && data.milestones.length > 0) {
-      const bufferTime = 300; // 5 minutes in seconds
-      adjustedDuration = data.duration + bufferTime;
-      console.log('⏰ Adding 5 minute buffer for milestone transactions');
-      console.log('   Original duration:', data.duration, 'seconds');
-      console.log('   Adjusted duration:', adjustedDuration, 'seconds');
+    console.log('═══════════════════════════════════════');
+    console.log('🚀 CREATING CAMPAIGN (SINGLE TRANSACTION)');
+    console.log('═══════════════════════════════════════');
+    console.log('📝 Campaign Details:');
+    console.log('   Name:', data.name);
+    console.log('   Beneficiary:', data.beneficiary);
+    console.log('   Duration:', data.duration, 'seconds');
+    console.log('   Funding Cap:', data.fundingCap, 'ETH');
+    
+    // Calculate human-readable duration
+    const hours = Math.floor(data.duration / 3600);
+    const minutes = Math.floor((data.duration % 3600) / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      console.log('   Duration (human):', days, 'days', hours % 24, 'hours');
+    } else if (hours > 0) {
+      console.log('   Duration (human):', hours, 'hours', minutes, 'minutes');
+    } else {
+      console.log('   Duration (human):', minutes, 'minutes');
     }
 
-    // Validate milestone amounts
-    if (data.milestones && data.milestones.length > 0) {
-      const totalMilestoneAmount = data.milestones.reduce((sum, m) => sum + parseFloat(m.amount), 0);
-      const fundingCapFloat = parseFloat(data.fundingCap);
+
+    const fundingCapWei = parseEther(data.fundingCap);
+    
+    // Prepare milestones array
+    const milestonesArray = data.milestones && data.milestones.length > 0
+      ? data.milestones.map(m => ({
+          description: m.description,
+          amount: parseEther(m.amount),
+        }))
+      : [];
+
+    if (milestonesArray.length > 0) {
+      console.log('🎯 Milestones (will be added in same transaction):');
+      milestonesArray.forEach((m, i) => {
+        console.log(`   ${i + 1}. ${m.description} - ${formatEther(m.amount)} ETH`);
+      });
       
-      console.log('📊 Milestone validation:');
-      console.log('  - Total milestones:', totalMilestoneAmount, 'ETH');
-      console.log('  - Funding cap:', fundingCapFloat, 'ETH');
-      
-      if (totalMilestoneAmount > fundingCapFloat) {
-        throw new Error(`Total milestone amount (${totalMilestoneAmount} ETH) exceeds funding cap (${fundingCapFloat} ETH)`);
+      // Validate total milestone amount
+      const totalMilestoneAmount = milestonesArray.reduce((sum, m) => sum + m.amount, BigInt(0));
+      if (totalMilestoneAmount > fundingCapWei) {
+        throw new Error(`Total milestone amount (${formatEther(totalMilestoneAmount)} ETH) exceeds funding cap (${data.fundingCap} ETH)`);
       }
     }
 
     try {
-      // Step 1: Create the campaign
-      console.log('📝 Step 1: Creating campaign...');
-      console.log('  - Name:', data.name);
-      console.log('  - Beneficiary:', data.beneficiary);
-      console.log('  - Duration:', adjustedDuration, 'seconds');
-      console.log('  - Funding Cap:', data.fundingCap, 'ETH');
+      // STEP 1: SIMULATE THE TRANSACTION
+      console.log('\n🧪 Simulating transaction...');
+      try {
+        await publicClient.simulateContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: 'createCampaign',
+          args: [
+            data.name,
+            data.beneficiary as Address,
+            BigInt(data.duration),
+            fundingCapWei,
+            milestonesArray,
+          ],
+          account: walletClient.account,
+        });
+        
+        console.log('✅ Simulation successful!');
+      } catch (simError: any) {
+        console.error('❌ SIMULATION FAILED:', simError);
+        throw new Error(`Transaction will fail: ${simError.shortMessage || simError.message}`);
+      }
 
-      const fundingCapWei = parseEther(data.fundingCap);
-
+      // STEP 2: SEND THE TRANSACTION (everything in one transaction!)
+      console.log('\n📤 Sending transaction...');
+      console.log('   ✨ Campaign + Milestones in SINGLE transaction!');
+      
       const hash = await walletClient.writeContract({
         address: FACTORY_ADDRESS,
         abi: FACTORY_ABI,
@@ -325,19 +318,22 @@ export function useCrowdfundFactory() {
         args: [
           data.name,
           data.beneficiary as Address,
-          BigInt(adjustedDuration),
+          BigInt(data.duration),
           fundingCapWei,
+          milestonesArray,
         ],
       });
 
-      console.log('📝 Transaction hash:', hash);
+      console.log('✅ Transaction sent:', hash);
       console.log('⏳ Waiting for confirmation...');
 
-      // Wait for transaction to be mined
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      console.log('✅ Campaign creation confirmed!');
+      
+      console.log('✅ Transaction confirmed!');
+      console.log('   Block:', receipt.blockNumber);
+      console.log('   Gas used:', receipt.gasUsed.toString());
 
-      // Get campaign address from event logs
+      // STEP 3: GET CAMPAIGN ADDRESS
       let campaignAddress: Address | undefined;
 
       for (const log of receipt.logs) {
@@ -359,93 +355,39 @@ export function useCrowdfundFactory() {
       }
 
       if (!campaignAddress) {
-        console.log('⚠️  Could not parse event, fetching from contract...');
         const allCampaigns = await publicClient.readContract({
           address: FACTORY_ADDRESS,
           abi: FACTORY_ABI,
           functionName: 'getAllCampaigns',
         }) as Address[];
 
-        if (allCampaigns.length > 0) {
-          campaignAddress = allCampaigns[allCampaigns.length - 1];
-          console.log('📍 Campaign address from contract:', campaignAddress);
-        } else {
-          throw new Error('Campaign created but address not found');
-        }
+        campaignAddress = allCampaigns[allCampaigns.length - 1];
+        console.log('📍 Campaign address (from getAllCampaigns):', campaignAddress);
       }
 
-      // Step 2: Add milestones if specified
-      if (data.milestones && data.milestones.length > 0) {
-        console.log('🎯 Step 2: Adding', data.milestones.length, 'milestones...');
-        console.log('⚡ Adding milestones immediately to avoid deadline issues');
-
-        for (let i = 0; i < data.milestones.length; i++) {
-          const milestone = data.milestones[i];
-          const milestoneAmountWei = parseEther(milestone.amount);
-          
-          console.log(`📌 Milestone ${i + 1}/${data.milestones.length}:`);
-          console.log(`   Description: ${milestone.description}`);
-          console.log(`   Amount: ${milestone.amount} ETH`);
-
-          try {
-            const milestoneHash = await walletClient.writeContract({
-              address: campaignAddress,
-              abi: CROWDFUND_ABI,
-              functionName: 'addMilestone',
-              args: [milestone.description, milestoneAmountWei],
-            });
-
-            console.log(`   Transaction: ${milestoneHash}`);
-            
-            const milestoneReceipt = await publicClient.waitForTransactionReceipt({ 
-              hash: milestoneHash,
-              timeout: 60_000, // 60 second timeout
-            });
-            
-            console.log(`   ✅ Milestone ${i + 1} added successfully`);
-          } catch (milestoneError: any) {
-            console.error(`   ❌ Error adding milestone ${i + 1}:`, milestoneError);
-            
-            // Check if it's a deadline error
-            if (milestoneError.message?.includes('Campaign has ended') || 
-                milestoneError.message?.includes('beforeDeadline')) {
-              throw new Error(`Milestone ${i + 1} failed: Campaign deadline passed. Try creating campaign with longer duration or fewer milestones.`);
-            }
-            
-            throw new Error(`Failed to add milestone ${i + 1}: ${milestoneError.shortMessage || milestoneError.message}`);
-          }
-        }
-
-        console.log('✅ All milestones added successfully!');
+      console.log('\n═══════════════════════════════════════');
+      console.log('🎉 CAMPAIGN CREATED SUCCESSFULLY!');
+      console.log('═══════════════════════════════════════');
+      if (milestonesArray.length > 0) {
+        console.log('✨ All milestones added in single transaction!');
       }
-
-      console.log('🎉 Campaign creation complete!');
+      
       return campaignAddress;
       
     } catch (error: any) {
-      console.error('❌ Error in createCampaign:', error);
+      console.error('\n═══════════════════════════════════════');
+      console.error('❌ CAMPAIGN CREATION FAILED');
+      console.error('═══════════════════════════════════════');
+      console.error('Error:', error);
       
-      // Extract meaningful error message
-      let errorMessage = 'Failed to create campaign';
+      let errorMessage = error.message || 'Failed to create campaign';
       
-      if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      if (error.shortMessage) {
-        errorMessage = error.shortMessage;
-      }
-      
-      // Check for common errors
       if (errorMessage.includes('user rejected') || errorMessage.includes('User rejected')) {
-        errorMessage = 'Transaction rejected by user';
+        errorMessage = 'You cancelled the transaction';
       } else if (errorMessage.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds for gas fees';
-      } else if (errorMessage.includes('Campaign has ended') || errorMessage.includes('beforeDeadline')) {
-        errorMessage = 'Campaign deadline passed while adding milestones. Please use a longer duration (recommended: at least 1 hour for campaigns with milestones).';
+        errorMessage = 'Insufficient funds to pay for gas fees';
       }
       
-      console.error('📛 Final error:', errorMessage);
       throw new Error(errorMessage);
     }
   };
@@ -455,7 +397,6 @@ export function useCrowdfundFactory() {
     await fetchCampaigns();
   };
 
-  // Fetch campaigns when public client is available
   useEffect(() => {
     if (publicClient) {
       fetchCampaigns();
