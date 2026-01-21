@@ -84,10 +84,11 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   let status: CampaignStatus;
   if (campaign.finalized) {
     status = 'Finalized';
-  } else if (isFullyFunded) {
-    status = 'Fully-Funded';
   } else if (isExpired) {
     status = 'Ended';
+  } else if (isFullyFunded) {
+    status = 'Fully-Funded';
+  
   } else {
     status = 'Active';
   }
