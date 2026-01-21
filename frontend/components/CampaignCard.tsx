@@ -47,14 +47,37 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const progress = (raised / goal) * 100;
   const campaignAddress = campaign.address as Address;
   
-
   // Calculate time remaining
   const now = Math.floor(Date.now() / 1000);
   const deadlineTimestamp = campaign.deadline;
   const isExpired = now > deadlineTimestamp;
-  const timeRemaining = campaign.deadline * 1000 - Date.now();
-  const daysLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60 * 24)));
-  const hoursLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60)));
+  const timeRemaining = deadlineTimestamp * 1000 - Date.now();
+  
+  // Calculate time remaining in milliseconds (more accurate)
+  const timeRemainingMs = Math.max(0, timeRemaining);
+
+  // Determine which unit to display BEFORE rounding
+  let timeLeftDisplay: string;
+
+  if (timeRemainingMs === 0 || isExpired) {
+    timeLeftDisplay = 'Ended';
+  } else if (timeRemainingMs >= 24 * 60 * 60 * 1000) {
+    // >= 24 hours = show in days
+    const daysLeft = Math.ceil(timeRemainingMs / (1000 * 60 * 60 * 24));
+    timeLeftDisplay = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
+  } else if (timeRemainingMs >= 60 * 60 * 1000) {
+    // >= 1 hour but < 24 hours = show in hours
+    const hoursLeft = Math.ceil(timeRemainingMs / (1000 * 60 * 60));
+    timeLeftDisplay = `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left`;
+  } else if (timeRemainingMs >= 60 * 1000) {
+    // >= 1 minute but < 1 hour = show in minutes
+    const minutesLeft = Math.ceil(timeRemainingMs / (1000 * 60));
+    timeLeftDisplay = `${minutesLeft} min${minutesLeft !== 1 ? 's' : ''} left`;
+  } else {
+    // < 1 minute = show in seconds
+    const secondsLeft = Math.ceil(timeRemainingMs / 1000);
+    timeLeftDisplay = `${secondsLeft} sec${secondsLeft !== 1 ? 's' : ''} left`;
+  }
 
   const isFullyFunded = campaign.totalRaised >= campaign.fundingCap;
 
@@ -122,7 +145,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
       bg: 'bg-emerald-500/15',
       border: 'border-emerald-500/30',
       text: 'text-emerald-400',
-      label: daysLeft > 0 ? `${daysLeft} days left` : `${hoursLeft} hours left`,
+      label: timeLeftDisplay,
     },
     'Fully-Funded': {
       bg: 'bg-green-500/15',
@@ -153,15 +176,9 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
-        {isActive ? (
-          <div className="px-3.5 py-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full text-emerald-400 text-xs font-semibold uppercase tracking-wide">
-            {daysLeft} days left
-          </div>
-        ) : (
-          <div className="px-3.5 py-1.5 bg-red-500/15 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold uppercase tracking-wide">
-            {campaign.finalized ? 'Finalized' : 'Ended'}
-          </div>
-        )}
+        <div className={`px-3.5 py-1.5 ${currentStatus.bg} border ${currentStatus.border} rounded-full ${currentStatus.text} text-xs font-semibold uppercase tracking-wide`}>
+          {currentStatus.label}
+        </div>
 
         {isCreator && (
           <div className="px-3.5 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-semibold uppercase tracking-wide">
