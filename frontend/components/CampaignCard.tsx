@@ -45,7 +45,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const raised = parseFloat(parseFloat(campaign.totalRaised) / 1e18 + '');
   const goal = parseFloat(parseFloat(campaign.fundingCap) / 1e18 + '');
   const progress = (raised / goal) * 100;
-
+  const campaignAddress = campaign.address as Address;
   
 
   // Calculate time remaining
@@ -88,10 +88,10 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
     try {
       setIsContributing(true);
 
-      console.log('💰 Contributing', contributionAmount, 'ETH to', campaign.address);
+      console.log('💰 Contributing', contributionAmount, 'ETH to', campaignAddress);
 
       const hash = await walletClient.writeContract({
-        address: campaign.address,
+        address: campaignAddress,
         abi: CROWDFUND_ABI,
         functionName: 'contribute',
         value: parseEther(contributionAmount),
@@ -171,7 +171,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
       </div>
 
       {/* Campaign Name */}
-      <Link href={`/campaign/${campaign.address}`} className="block mb-6 group/link">
+      <Link href={`/campaign/${campaignAddress}`} className="block mb-6 group/link">
         <h3 className="text-2xl font-bold text-white leading-tight tracking-tight group-hover/link:text-purple-400 transition-colors duration-200">
           {campaign.name}
         </h3>
@@ -252,7 +252,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
       {/* View Details Button */}
       {!isActive && (
         <Link
-          href={`/campaign/${campaign.address}`}
+          href={`/campaign/${campaignAddress}`}
           className="block w-full px-4 py-3 text-center bg-white/5 border border-white/10 rounded-xl text-white/80 font-semibold hover:bg-white/8 hover:border-indigo-500/30 transition-all"
         >
           View Details
