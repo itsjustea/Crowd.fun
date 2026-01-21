@@ -278,23 +278,164 @@ export default function CampaignPage() {
     }
   };
 
+  // const handleFinalize = async () => {
+  //   if (!walletClient || !publicClient) return;
+
+  //   try {
+  //     setIsProcessing(true);
+  //     const hash = await walletClient.writeContract({
+  //       address: campaignAddress,
+  //       abi: CROWDFUND_ABI,
+  //       functionName: 'finalize',
+  //     });
+
+  //     await publicClient.waitForTransactionReceipt({ hash });
+  //     alert('Campaign finalized successfully!');
+  //     await fetchCampaign();
+  //   } catch (error: any) {
+  //     console.error('❌ Finalize error:', error);
+  //     alert(error.shortMessage || 'Failed to finalize campaign');
+  //   } finally {
+  //     setIsProcessing(false);
+  //   }
+  // };
   const handleFinalize = async () => {
-    if (!walletClient || !publicClient) return;
+    if (!walletClient || !publicClient || !campaign) return;
 
     try {
       setIsProcessing(true);
-      const hash = await walletClient.writeContract({
-        address: campaignAddress,
-        abi: CROWDFUND_ABI,
-        functionName: 'finalize',
-      });
+      
+      console.log('🔍 Attempting to finalize campaign...');
+      
+      // Check current status
+      const now = Math.floor(Date.now() / 1000);
+      const deadlineTimestamp = Number(campaign.deadline);
+      const raised = parseFloat(formatEther(BigInt(campaign.totalFundsRaised)));
+      const goal = parseFloat(formatEther(BigInt(campaign.fundingCap)));
+      
+      console.log('📊 Campaign State:');
+      console.log('   Deadline passed:', now >= deadlineTimestamp);
+      console.log('   Is finalized:', campaign.finalized);
+      console.log('   Funds raised:', raised, 'ETH');
+      console.log('   Funding goal:', goal, 'ETH');
+      console.log('   Is successful:', raised >= goal);
+      console.log('   Is empty:', raised === 0);
+      
+      if (now < deadlineTimestamp) {
+        alert('Cannot finalize: Campaign is still active!');
+        return;
+      }
+      
+      if (campaign.finalized) {
+        alert('Campaign is already finalized!');
+        return;
+      }
+      
+      // Special handling for empty campaigns
+      if (raised === 0) {
+        const confirmEmpty = confirm(
+          'This campaign has no contributions.\n\n' +
+          'Finalizing an empty campaign will mark it as failed.\n\n' +
+          'Continue?'
+        );
+        
+        if (!confirmEmpty) return;
+      }
+      
+      // Warn about refunds if campaign failed
+      if (raised > 0 && raised < goal) {
+        const confirmFailed = confirm(
+          `Campaign did not reach its goal.\n\n` +
+          `Raised: ${raised.toFixed(4)} ETH\n` +
+          `Goal: ${goal.toFixed(4)} ETH\n\n` +
+          `After finalization, contributors will need to manually claim refunds.\n\n` +
+          `Continue?`
+        );
+        
+        if (!confirmFailed) return;
+      }
+      
+      console.log('📤 Sending finalize transaction...');
+      
+      try {
+        // Use explicit gas for empty campaigns
+        const gasLimit = raised === 0 ? BigInt(100000) : BigInt(300000);
+        
+        const hash = await walletClient.writeContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'finalize',
+          gas: gasLimit,
+        });
 
-      await publicClient.waitForTransactionReceipt({ hash });
-      alert('Campaign finalized successfully!');
-      await fetchCampaign();
+        console.log('📝 Transaction hash:', hash);
+        console.log('⏳ Waiting for confirmation...');
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        
+        if (receipt.status === 'success') {
+          console.log('✅ Campaign finalized!');
+          
+          let message = 'Campaign finalized successfully! 🎉\n\n';
+          
+          if (raised >= goal) {
+            message += 'Campaign was successful! Funds are now in escrow.';
+            if (campaign.milestones && campaign.milestones.length > 0) {
+              message += '\n\nYou can now mark milestones as complete to release funds.';
+            } else {
+              message += '\n\nYou can now release all funds to the beneficiary.';
+            }
+          } else if (raised > 0) {
+            message += `Campaign did not reach its goal.\n\n`;
+            message += `Contributors can now claim refunds.`;
+          } else {
+            message += 'Campaign ended with no contributions.';
+          }
+          
+          alert(message);
+          await fetchCampaign();
+        } else {
+          alert('Transaction failed. Please try again.');
+        }
+        
+      } catch (txError: any) {
+        console.error('Transaction error:', txError);
+        
+        // Check if already finalized
+        const currentState = await publicClient.readContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'finalized',
+        });
+        
+        if (currentState) {
+          alert('Campaign was already finalized. Refreshing...');
+          await fetchCampaign();
+          return;
+        }
+        
+        throw txError;
+      }
+      
     } catch (error: any) {
       console.error('❌ Finalize error:', error);
-      alert(error.shortMessage || 'Failed to finalize campaign');
+      
+      let errorMsg = 'Failed to finalize campaign:\n\n';
+      
+      if (error.message?.includes('Campaign still active')) {
+        errorMsg += 'The deadline has not passed yet.';
+      } else if (error.message?.includes('Campaign already finalized')) {
+        errorMsg += 'Campaign is already finalized.';
+      } else if (error.message?.includes('user rejected')) {
+        errorMsg = 'Transaction cancelled.';
+      } else if (error.message?.includes('insufficient funds')) {
+        errorMsg += 'Insufficient ETH for gas fees.';
+      } else {
+        errorMsg += error.shortMessage || error.message || 'Unknown error';
+        errorMsg += '\n\nTry increasing gas limit in MetaMask.';
+      }
+      
+      alert(errorMsg);
     } finally {
       setIsProcessing(false);
     }
@@ -442,14 +583,39 @@ export default function CampaignPage() {
   const goal = parseFloat(formatEther(campaign.fundingCap));
   const progress = (raised / goal) * 100;
 
+  
   // Calculate time remaining
   const timeRemaining = deadlineTimestamp * 1000 - Date.now();
-  const daysLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60 * 24)));
-  const hoursLeft = Math.max(0, Math.ceil(timeRemaining / (1000 * 60 * 60)));
+  
+  // Calculate time remaining in milliseconds (more accurate)
+  const timeRemainingMs = Math.max(0, timeRemaining);
+
+  // Determine which unit to display BEFORE rounding
+  let timeLeftDisplay: string;
+
+  if (timeRemainingMs === 0 || isExpired) {
+    timeLeftDisplay = 'Ended';
+  } else if (timeRemainingMs >= 24 * 60 * 60 * 1000) {
+    // >= 24 hours = show in days
+    const daysLeft = Math.ceil(timeRemainingMs / (1000 * 60 * 60 * 24));
+    timeLeftDisplay = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
+  } else if (timeRemainingMs >= 60 * 60 * 1000) {
+    // >= 1 hour but < 24 hours = show in hours
+    const hoursLeft = Math.ceil(timeRemainingMs / (1000 * 60 * 60));
+    timeLeftDisplay = `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left`;
+  } else if (timeRemainingMs >= 60 * 1000) {
+    // >= 1 minute but < 1 hour = show in minutes
+    const minutesLeft = Math.ceil(timeRemainingMs / (1000 * 60));
+    timeLeftDisplay = `${minutesLeft} min${minutesLeft !== 1 ? 's' : ''} left`;
+  } else {
+    // < 1 minute = show in seconds
+    const secondsLeft = Math.ceil(timeRemainingMs / 1000);
+    timeLeftDisplay = `${secondsLeft} sec${secondsLeft !== 1 ? 's' : ''} left`;
+  }
 
   // Status badge configuration
   const statusConfig = {
-    active: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-400', label: `${daysLeft} days left`, icon: '⏳' },
+    active: { bg: 'bg-emerald-500/15', border: 'border-emerald-500/30', text: 'text-emerald-400', label: timeLeftDisplay, icon: '⏳' },
     successful: { bg: 'bg-green-500/15', border: 'border-green-500/30', text: 'text-green-400', label: 'Fully Funded', icon: '✅' },
     failed: { bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-400', label: 'Campaign Ended', icon: '❌' },
     ended: { bg: 'bg-orange-500/15', border: 'border-orange-500/30', text: 'text-orange-400', label: 'Ended', icon: '⏸' },
@@ -583,9 +749,9 @@ export default function CampaignPage() {
                 <div className="flex items-center gap-3 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                   <span className="text-2xl">⏰</span>
                   <div>
-                    <p className="text-white font-semibold">
-                      {daysLeft > 0 ? `${daysLeft} days` : `${hoursLeft} hours`} remaining
-                    </p>
+                    <div className={`px-3.5 py-1.5 ${currentStatus.bg} border ${currentStatus.border} rounded-full ${currentStatus.text} text-xs font-semibold uppercase tracking-wide`}>
+                      {currentStatus.label}
+                    </div>
                     <p className="text-xs text-white/50">Ends {new Date(deadlineTimestamp * 1000).toLocaleDateString()}</p>
                   </div>
                 </div>
