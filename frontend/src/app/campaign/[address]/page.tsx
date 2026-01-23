@@ -6,6 +6,7 @@ import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import type { Address } from 'viem';
 import Link from 'next/link';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const CROWDFUND_ABI = [
   {
@@ -685,14 +686,14 @@ export default function CampaignPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-white text-xl mb-4">Campaign not found</p>
-          <Link href="/" className="text-indigo-400 hover:text-indigo-300">
-            ← Back to campaigns
-          </Link>
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-white text-xl mb-4">Campaign not found</p>
+            <Link href="/" className="text-indigo-400 hover:text-indigo-300">
+              ← Back to campaigns
+            </Link>
+          </div>
         </div>
-      </div>
     );
   }
 
@@ -769,9 +770,8 @@ export default function CampaignPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950">
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(99,102,241,0.05)_0%,transparent_50%),radial-gradient(circle_at_80%_70%,rgba(168,85,247,0.05)_0%,transparent_50%)]" />
-      </div>
-
-      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/10">
+      </div> 
+      <header className="sticky top-22 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <Link href="/" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors">
             <span className="text-xl">←</span>
@@ -1057,11 +1057,11 @@ export default function CampaignPage() {
                   </p>
                 </>
               ) : (
-                <div className="text-center py-8">
+                <div className="flex flex-col items-center py-8">
                   {!account ? (
                     <>
                       <p className="text-white/60 mb-4">Connect your wallet to contribute</p>
-                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center text-3xl">👛</div>
+                      <ConnectButton />
                     </>
                   ) : isCreator ? (
                     <>
