@@ -45,9 +45,9 @@ export default function Home() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-[linear-gradient(rgba(99,102,241,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.1)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(circle,rgba(0,0,0,0.3)_0%,transparent_70%)] pointer-events-none" />
 
           <h2 className="text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight animate-fade-in-up">
-            Crowdfunding with
+            Create Crowdfunds
             <span className="block bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-              Milestone Escrow
+              With Milestones
             </span>
           </h2>
 
