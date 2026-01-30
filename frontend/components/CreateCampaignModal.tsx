@@ -25,7 +25,7 @@ export default function CreateCampaignModal({
   const {factoryAbi, factoryAddress} = useCrowdfundFactory();
   const [step, setStep] = useState<number>(1);
   const [name, setName] = useState<string>('');
-  const [beneficiary, setBeneficiary] = useState<string>('');
+  const [beneficiary, setBeneficiary] = useState<string>(useAccount().address || '');
   const [duration, setDuration] = useState<string>('');
   const [durationUnit, setDurationUnit] = useState<DurationUnit>('days');
   const [fundingCap, setFundingCap] = useState<string>('');
@@ -176,7 +176,7 @@ export default function CreateCampaignModal({
   };
 
   if (!isOpen) return null;
-
+  
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 rounded-2xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -203,14 +203,14 @@ export default function CreateCampaignModal({
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="My Awesome Project"
+                  placeholder="Project Name"
                   className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Beneficiary Address (optional, defaults to you)
+                  Beneficiary Address 
                 </label>
                 <input
                   type="text"
@@ -224,7 +224,7 @@ export default function CreateCampaignModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Duration *
+                    Duration
                   </label>
                   <input
                     type="number"

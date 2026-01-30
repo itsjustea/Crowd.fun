@@ -373,15 +373,39 @@ export default function CampaignDetails() {
               <div className="space-y-4">
                 <div>
                   <div className="text-gray-400 text-sm">Beneficiary Address</div>
-                  <div className="text-white font-mono text-sm mt-1">
+                  <a
+                    href={`https://sepolia.arbiscan.io/address/${campaign.beneficiary}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
+                  >
                     {campaign.beneficiary}
-                  </div>
+                    <span className="text-xs flex-shrink-0">↗</span>
+                  </a>
                 </div>
                 <div>
                   <div className="text-gray-400 text-sm">Creator Address</div>
-                  <div className="text-white font-mono text-sm mt-1">
+                  <a
+                    href={`https://sepolia.arbiscan.io/address/${campaign.creator}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
+                  >
                     {campaign.creator}
-                  </div>
+                    <span className="text-xs flex-shrink-0">↗</span>
+                  </a>
+                </div>
+                <div>
+                  <div className="text-gray-400 text-sm">Escrow Address</div>
+                  <a
+                    href={`https://sepolia.arbiscan.io/address/${campaignAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 font-mono text-sm flex items-center gap-2 break-all"
+                  >
+                    {campaignAddress}
+                    <span className="text-xs flex-shrink-0">↗</span>
+                  </a>
                 </div>
                 <div>
                   <div className="text-gray-400 text-sm">Campaign Status</div>
