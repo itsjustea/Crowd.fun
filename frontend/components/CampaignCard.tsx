@@ -247,22 +247,22 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
             className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 font-mono focus:outline-none focus:border-indigo-500/50 focus:bg-white/8 focus:ring-3 focus:ring-indigo-500/10 transition-all"
           />
           <button
-  onClick={handleContribute}
-  disabled={isContributing}
-  className="
-    shrink-0
-    px-5 py-2.5
-    text-sm font-semibold text-white
-    bg-gradient-to-r from-indigo-600 to-purple-600
-    rounded-xl whitespace-nowrap
-    hover:-translate-y-0.5
-    hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)]
-    transition-all duration-200
-    disabled:opacity-50 disabled:cursor-not-allowed
-  "
->
-  {isContributing ? 'Contributing...' : 'Contribute'}
-</button>
+            onClick={handleContribute}
+            disabled={isContributing}
+            className="
+              shrink-0
+              px-5 py-2.5
+              text-sm font-semibold text-white
+              bg-gradient-to-r from-indigo-600 to-purple-600
+              rounded-xl whitespace-nowrap
+              hover:-translate-y-0.5
+              hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)]
+              transition-all duration-200
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          >
+            {isContributing ? 'Contributing...' : 'Contribute'}
+          </button>
 
         </div>
       )}

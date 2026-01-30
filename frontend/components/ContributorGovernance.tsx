@@ -1,129 +1,47 @@
 // components/ContributorGovernance.tsx
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import type { Address, Abi } from 'viem';
-
-interface Milestone {
-  description: string;
-  amount: bigint;
-  completed: boolean;
-  fundsReleased: boolean;
-}
-
-interface VoteStatus {
-  votesFor: bigint;
-  votesAgainst: bigint;
-  votingDeadline: number;
-  resolved: boolean;
-  approved: boolean;
-  hasVoted: boolean;
-  voteChoice: boolean;
-}
+import { useCampaignDetails } from '@/hooks/UseCampaignDetails';
 
 interface ContributorGovernanceProps {
   campaignAddress: Address;
   campaignAbi: Abi;
   isCreator: boolean;
   hasContributed: boolean;
-  userContribution: bigint;
+  userContribution?: bigint;
 }
-
-type VotingStatus = 'not-started' | 'completed-no-vote' | 'approved' | 'rejected' | 'ended-pending' | 'active';
 
 export default function ContributorGovernance({ 
   campaignAddress, 
-  campaignAbi, 
-  isCreator,
-  hasContributed,
-  userContribution 
+  campaignAbi,
 }: ContributorGovernanceProps) {
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [voteStatuses, setVoteStatuses] = useState<Record<number, VoteStatus>>({});
-  const [loading, setLoading] = useState<boolean>(true);
-  const [governanceEnabled, setGovernanceEnabled] = useState<boolean>(false);
-  const [isFinalized, setIsFinalized] = useState<boolean>(false);
-  const [isSuccessful, setIsSuccessful] = useState<boolean>(false);
-  const [totalRaised, setTotalRaised] = useState<bigint>(BigInt(0));
+  const [votingInProgress, setVotingInProgress] = useState<Record<number, boolean>>({});
   
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { address } = useAccount();
 
-  useEffect(() => {
-    fetchMilestones();
-    fetchCampaignStatus();
-  }, [campaignAddress]);
-
-  const fetchCampaignStatus = async (): Promise<void> => {
-    try {
-      if (!publicClient) return;
-
-      const details = await publicClient.readContract({
-        address: campaignAddress,
-        abi: campaignAbi,
-        functionName: 'getCampaignDetails',
-      }) as readonly [string, Address, bigint, bigint, bigint, boolean, boolean, Address, bigint, boolean, bigint];
-      
-      setIsFinalized(details[5]); // finalized
-      setIsSuccessful(details[6]); // successful
-      setGovernanceEnabled(details[9]); // governanceEnabled
-      setTotalRaised(details[4]); // totalFundsRaised
-    } catch (error) {
-      console.error('Error fetching campaign status:', error);
-    }
-  };
-
-  const fetchMilestones = async (): Promise<void> => {
-    setLoading(true);
-    try {
-      if (!publicClient) return;
-
-      const milestonesData = await publicClient.readContract({
-        address: campaignAddress,
-        abi: campaignAbi,
-        functionName: 'getAllMilestones',
-      }) as Milestone[];
-      
-      setMilestones(milestonesData);
-      
-      // Fetch vote status for each milestone
-      const votePromises = milestonesData.map((_, index) =>
-        publicClient.readContract({
-          address: campaignAddress,
-          abi: campaignAbi,
-          functionName: 'getMilestoneVoteStatus',
-          args: [BigInt(index)],
-        }) as Promise<readonly [bigint, bigint, bigint, boolean, boolean, boolean, boolean]>
-      );
-      
-      const voteData = await Promise.all(votePromises);
-      
-      const statuses: Record<number, VoteStatus> = {};
-      voteData.forEach((vote, index) => {
-        statuses[index] = {
-          votesFor: vote[0],
-          votesAgainst: vote[1],
-          votingDeadline: Number(vote[2]),
-          resolved: vote[3],
-          approved: vote[4],
-          hasVoted: vote[5],
-          voteChoice: vote[6],
-        };
-      });
-      
-      setVoteStatuses(statuses);
-    } catch (error) {
-      console.error('Error fetching milestones:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Use the enhanced hook
+  const {
+    campaign,
+    milestones,
+    voteStatuses,
+    loading,
+    error,
+    refetch,
+    getVoteStatistics
+  } = useCampaignDetails(campaignAddress, campaignAbi);
 
   const startVoting = async (milestoneId: number): Promise<void> => {
-    try {
-      if (!publicClient || !walletClient || !address) return;
+    if (!publicClient || !walletClient || !address) {
+      alert('Please connect your wallet');
+      return;
+    }
 
+    setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
+    try {
       const { request } = await publicClient.simulateContract({
         address: campaignAddress,
         abi: campaignAbi,
@@ -136,17 +54,23 @@ export default function ContributorGovernance({
       await publicClient.waitForTransactionReceipt({ hash });
       
       alert('✅ Voting started for milestone!');
-      await fetchMilestones();
+      await refetch();
     } catch (error) {
       console.error('Error starting vote:', error);
       alert('Failed to start voting: ' + (error as Error).message);
+    } finally {
+      setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
   };
 
   const castVote = async (milestoneId: number, support: boolean): Promise<void> => {
-    try {
-      if (!publicClient || !walletClient || !address) return;
+    if (!publicClient || !walletClient || !address) {
+      alert('Please connect your wallet');
+      return;
+    }
 
+    setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
+    try {
       const { request } = await publicClient.simulateContract({
         address: campaignAddress,
         abi: campaignAbi,
@@ -159,17 +83,23 @@ export default function ContributorGovernance({
       await publicClient.waitForTransactionReceipt({ hash });
       
       alert(`✅ Vote cast ${support ? 'FOR' : 'AGAINST'} milestone!`);
-      await fetchMilestones();
+      await refetch();
     } catch (error) {
       console.error('Error casting vote:', error);
       alert('Failed to cast vote: ' + (error as Error).message);
+    } finally {
+      setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
   };
 
   const resolveVote = async (milestoneId: number): Promise<void> => {
-    try {
-      if (!publicClient || !walletClient || !address) return;
+    if (!publicClient || !walletClient || !address) {
+      alert('Please connect your wallet');
+      return;
+    }
 
+    setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
+    try {
       const { request } = await publicClient.simulateContract({
         address: campaignAddress,
         abi: campaignAbi,
@@ -182,17 +112,13 @@ export default function ContributorGovernance({
       await publicClient.waitForTransactionReceipt({ hash });
       
       alert('✅ Vote resolved!');
-      await fetchMilestones();
+      await refetch();
     } catch (error) {
       console.error('Error resolving vote:', error);
       alert('Failed to resolve vote: ' + (error as Error).message);
+    } finally {
+      setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
-  };
-
-  const calculateVotePercentage = (votesFor: bigint, votesAgainst: bigint): number => {
-    const total = votesFor + votesAgainst;
-    if (total === BigInt(0)) return 0;
-    return Number((votesFor * BigInt(100)) / total);
   };
 
   const getTimeRemaining = (deadline: number): string => {
@@ -208,12 +134,13 @@ export default function ContributorGovernance({
     return `${hours}h remaining`;
   };
 
-  const getVotingStatus = (milestoneId: number): VotingStatus => {
+  const getVotingStatus = (milestoneId: number): 
+    'not-started' | 'completed-no-vote' | 'approved' | 'rejected' | 'ended-pending' | 'active' => {
     const vote = voteStatuses[milestoneId];
     const milestone = milestones[milestoneId];
     
-    if (!vote) return 'not-started';
-    if (milestone.completed && !governanceEnabled) return 'completed-no-vote';
+    if (!vote || !milestone) return 'not-started';
+    if (milestone.completed && !campaign?.governanceEnabled) return 'completed-no-vote';
     if (vote.resolved && vote.approved) return 'approved';
     if (vote.resolved && !vote.approved) return 'rejected';
     if (vote.votingDeadline === 0) return 'not-started';
@@ -224,7 +151,23 @@ export default function ContributorGovernance({
     return 'active';
   };
 
-  if (!governanceEnabled) {
+  if (loading) {
+    return (
+      <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="text-center text-gray-400 py-8">Loading governance data...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
+        <div className="text-center text-red-400 py-8">Error: {error}</div>
+      </div>
+    );
+  }
+
+  if (!campaign?.governanceEnabled) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
         <h2 className="text-2xl font-bold text-white mb-4">Contributor Governance</h2>
@@ -235,7 +178,7 @@ export default function ContributorGovernance({
     );
   }
 
-  if (!isFinalized || !isSuccessful) {
+  if (!campaign.finalized || !campaign.successful) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
         <h2 className="text-2xl font-bold text-white mb-4">Contributor Governance</h2>
@@ -251,18 +194,26 @@ export default function ContributorGovernance({
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white mb-2">Contributor Governance</h2>
         <p className="text-gray-400 text-sm">
-          Contributors vote on milestone completion. 60% approval required. Vote weight based on contribution amount.
+          One person, one vote. 60% approval required. Each contributor has equal voting power.
         </p>
-        {hasContributed && (
-          <p className="text-blue-400 text-sm mt-2">
-            Your voting power: {formatEther(userContribution)} ETH
+        <div className="mt-2 bg-blue-900/20 border border-blue-700 rounded-lg p-3">
+          <p className="text-blue-300 text-sm">
+            📊 Total Contributors: <span className="font-semibold">{campaign.totalContributors}</span> voters
           </p>
-        )}
+          {campaign.hasContributed && (
+            <p className="text-green-400 text-sm mt-1">
+              ✓ You have voting rights (1 vote per milestone)
+            </p>
+          )}
+          {!campaign.isCreator &&!campaign.hasContributed && (
+            <p className="text-yellow-400 text-sm mt-1">
+              ⚠️ You must contribute to participate in voting
+            </p>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="text-center text-gray-400 py-8">Loading milestones...</div>
-      ) : milestones.length === 0 ? (
+      {milestones.length === 0 ? (
         <div className="text-center text-gray-400 py-8">
           No milestones defined for this campaign.
         </div>
@@ -270,12 +221,9 @@ export default function ContributorGovernance({
         <div className="space-y-4">
           {milestones.map((milestone, index) => {
             const status = getVotingStatus(index);
-            const vote = voteStatuses[index] || {} as VoteStatus;
-            const percentFor = calculateVotePercentage(vote.votesFor || BigInt(0), vote.votesAgainst || BigInt(0));
-            const totalVotes = (vote.votesFor || BigInt(0)) + (vote.votesAgainst || BigInt(0));
-            const participation = totalRaised > BigInt(0) 
-              ? Number((totalVotes * BigInt(100)) / totalRaised)
-              : 0;
+            const vote = voteStatuses[index];
+            const voteStats = getVoteStatistics(index);
+            const isProcessing = votingInProgress[index];
 
             return (
               <div
@@ -284,7 +232,7 @@ export default function ContributorGovernance({
               >
                 {/* Milestone Header */}
                 <div className="flex justify-between items-start mb-4">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold text-white">
                       Milestone {index + 1}
                     </h3>
@@ -319,90 +267,170 @@ export default function ContributorGovernance({
                   </div>
                 </div>
 
-                {/* Voting Status */}
-                {status !== 'not-started' && status !== 'completed-no-vote' && (
+                {/* Voting Section */}
+                {status !== 'not-started' && status !== 'completed-no-vote' && vote && voteStats && (
                   <div className="mt-4">
                     {/* Vote Progress Bar */}
-                    <div className="mb-3">
+                    <div className="mb-4">
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-400">
-                          For: {formatEther(vote.votesFor || BigInt(0))} ETH ({percentFor}%)
+                          For: {Number(vote.votesFor)} votes ({voteStats.percentageFor}%)
                         </span>
                         <span className="text-gray-400">
-                          Against: {formatEther(vote.votesAgainst || BigInt(0))} ETH ({100 - percentFor}%)
+                          Against: {Number(vote.votesAgainst)} votes ({voteStats.percentageAgainst}%)
                         </span>
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-3">
                         <div
                           className={`h-3 rounded-full transition-all ${
-                            percentFor >= 60 ? 'bg-green-500' : 'bg-blue-500'
+                            voteStats.percentageFor >= 60 ? 'bg-green-500' : 'bg-blue-500'
                           }`}
-                          style={{ width: `${percentFor}%` }}
+                          style={{ width: `${voteStats.percentageFor}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>Participation: {participation.toFixed(1)}%</span>
-                        <span>Required: 60%</span>
+                      <div className="flex justify-between text-xs text-gray-500 mt-2">
+                        <span>
+                          Participation: {voteStats.participationRate}% 
+                          ({voteStats.totalVotes}/{campaign.totalContributors} contributors)
+                        </span>
+                        <span>
+                          {voteStats.hasReachedQuorum 
+                            ? '✓ Quorum met (30% minimum)' 
+                            : '⚠️ Need 30% participation'}
+                        </span>
                       </div>
                     </div>
 
                     {/* Time Remaining */}
-                    {status === 'active' && (
+                    {status === 'active' && vote.votingDeadline > 0 && (
                       <p className="text-sm text-gray-400 mb-3">
                         ⏰ {getTimeRemaining(vote.votingDeadline)}
                       </p>
                     )}
 
                     {/* Voting Buttons */}
-                    {status === 'active' && hasContributed && (
+                    {status === 'active' && campaign.hasContributed && (
                       <div className="flex gap-3">
                         {vote.hasVoted ? (
-                          <div className="w-full px-4 py-2 bg-gray-700 text-gray-400 rounded-lg text-center">
+                          <div className="w-full px-4 py-3 bg-gray-700 text-gray-300 rounded-lg text-center">
                             You voted: {vote.voteChoice ? '✓ FOR' : '✗ AGAINST'}
                           </div>
                         ) : (
                           <>
                             <button
                               onClick={() => castVote(index, true)}
-                              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+                              disabled={isProcessing}
+                              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
                             >
-                              ✓ Vote FOR
+                              {isProcessing ? 'Processing...' : '✓ Vote FOR'}
                             </button>
                             <button
                               onClick={() => castVote(index, false)}
-                              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+                              disabled={isProcessing}
+                              className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
                             >
-                              ✗ Vote AGAINST
+                              {isProcessing ? 'Processing...' : '✗ Vote AGAINST'}
                             </button>
                           </>
                         )}
                       </div>
                     )}
 
-                    {/* Resolve Button */}
-                    {status === 'ended-pending' && (
+                    {/* Non-contributor Message */}
+                    {status === 'active' && !campaign.hasContributed && (
+                      <div className="w-full px-4 py-3 bg-yellow-900/30 border border-yellow-700 text-yellow-300 rounded-lg text-center">
+                        Only contributors can vote
+                      </div>
+                    )}
+
+                    {/* Resolve Vote Button */}
+                    {status === 'ended-pending' && voteStats.canResolve && (
                       <button
                         onClick={() => resolveVote(index)}
-                        className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                        disabled={isProcessing}
+                        className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
                       >
-                        Resolve Vote
+                        {isProcessing ? 'Resolving...' : 'Resolve Vote'}
                       </button>
                     )}
+
+                    {/* Quorum Not Met Warning */}
+                    {status === 'ended-pending' && !voteStats.hasReachedQuorum && (
+                      <div className="w-full px-4 py-3 bg-red-900/30 border border-red-700 text-red-300 rounded-lg text-center text-sm">
+                        ⚠️ Vote cannot be resolved - minimum 30% participation required
+                      </div>
+                    )}
+
+                    {/* Vote Statistics Details */}
+                    <div className="mt-4 pt-4 border-t border-gray-700">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-400">Approval Required:</span>
+                          <span className="text-white ml-2">60%</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Current Approval:</span>
+                          <span className={`ml-2 ${voteStats.percentageFor >= 60 ? 'text-green-400' : 'text-white'}`}>
+                            {voteStats.percentageFor}%
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Min Participation:</span>
+                          <span className="text-white ml-2">30%</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-400">Current Participation:</span>
+                          <span className={`ml-2 ${voteStats.hasReachedQuorum ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {voteStats.participationRate}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {/* Start Voting Button (Creator Only) */}
-                {status === 'not-started' && isCreator && (
+                {status === 'not-started' && campaign.isCreator && (
                   <button
                     onClick={() => startVoting(index)}
-                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors mt-4"
+                    disabled={isProcessing}
+                    className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 text-white font-semibold rounded-lg transition-colors mt-4"
                   >
-                    Start Voting on Milestone Completion
+                    {isProcessing ? 'Starting Vote...' : 'Start Voting on Milestone Completion'}
                   </button>
+                )}
+
+                {/* Not Started Message (Non-Creator) */}
+                {status === 'not-started' && !campaign.isCreator && (
+                  <div className="mt-4 px-4 py-3 bg-gray-700 text-gray-400 rounded-lg text-center">
+                    Waiting for creator to start voting on this milestone
+                  </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Governance Summary */}
+      {milestones.length > 0 && (
+        <div className="mt-6 bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+          <div className="text-blue-300 font-semibold mb-2">📋 Governance Summary</div>
+          <div className="text-sm text-blue-200 space-y-1">
+            <div>Total Milestones: {milestones.length}</div>
+            <div>
+              Approved: {milestones.filter((_, i) => {
+                const vote = voteStatuses[i];
+                return vote?.resolved && vote?.approved;
+              }).length}
+            </div>
+            <div>
+              Active Votes: {milestones.filter((_, i) => getVotingStatus(i) === 'active').length}
+            </div>
+            <div>
+              Pending Resolution: {milestones.filter((_, i) => getVotingStatus(i) === 'ended-pending').length}
+            </div>
+          </div>
         </div>
       )}
     </div>

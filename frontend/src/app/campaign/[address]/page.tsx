@@ -161,7 +161,7 @@ export default function CampaignDetails() {
     const now = Math.floor(Date.now() / 1000);
     const remaining = campaign.deadline - now;
     
-    if (remaining <= 0) return 'Campaign ended';
+    if (remaining <= 0) return 'Campaign Ended';
     
     const days = Math.floor(remaining / 86400);
     const hours = Math.floor((remaining % 86400) / 3600);
@@ -261,7 +261,7 @@ export default function CampaignDetails() {
             </div>
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-gray-400 text-sm">Milestones</div>
-              <div className="text-white font-semibold mt-1">{campaign.milestoneCount} phases</div>
+              <div className="text-white font-semibold mt-1">{campaign.milestoneCount}</div>
             </div>
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-gray-400 text-sm">Governance</div>
@@ -282,7 +282,7 @@ export default function CampaignDetails() {
           )}
 
           {/* Finalization Button - NEW! */}
-          {canFinalize && (
+          {isCreator && canFinalize && (
             <div className="mt-6">
               <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-4">
                 <div className="text-yellow-300 text-sm font-semibold mb-2">

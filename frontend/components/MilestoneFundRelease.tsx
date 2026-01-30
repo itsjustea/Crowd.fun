@@ -261,10 +261,10 @@ export default function MilestoneFundRelease({
                 <div className="text-sm text-gray-400 mb-2">Voting Results:</div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">
-                    For: {formatEther(voteStatuses[index].votesFor)} ETH
+                    For: {(voteStatuses[index].votesFor)}
                   </span>
                   <span className="text-gray-300">
-                    Against: {formatEther(voteStatuses[index].votesAgainst)} ETH
+                    Against: {(voteStatuses[index].votesAgainst)}
                   </span>
                 </div>
               </div>

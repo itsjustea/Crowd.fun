@@ -77,6 +77,13 @@ export const CROWDFUND_ABI = [
   },
   {
     type: 'function',
+    name: 'getTotalContributors',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'governanceEnabled',
     inputs: [],
     outputs: [{ type: 'bool' }],
