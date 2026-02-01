@@ -77,16 +77,27 @@ export const CROWDFUND_ABI = [
   },
   {
     type: 'function',
-    name: 'getTotalContributors',
+    name: 'governanceEnabled',
     inputs: [],
-    outputs: [{ type: 'uint256' }],
+    outputs: [{ type: 'bool' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
-    name: 'governanceEnabled',
+    name: 'getNFTRewardInfo',
+    inputs: [{ name: 'contributor', type: 'address' }],
+    outputs: [
+      { name: 'eligible', type: 'bool' },
+      { name: 'minted', type: 'bool' },
+      { name: 'tokenId', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getTotalContributors',
     inputs: [],
-    outputs: [{ type: 'bool' }],
+    outputs: [{ type: 'uint256' }],
     stateMutability: 'view',
   },
   
@@ -154,6 +165,20 @@ export const CROWDFUND_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
+  {
+    type: 'function',
+    name: 'withdrawFunds',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'fundsWithdrawn',
+    inputs: [],
+    outputs: [{ type: 'bool' }],
+    stateMutability: 'view',
+  },
   
   // ========== EVENTS ==========
   {
@@ -205,6 +230,14 @@ export const CROWDFUND_ABI = [
     inputs: [
       { indexed: false, name: 'milestoneId', type: 'uint256' },
       { indexed: false, name: 'approved', type: 'bool' }
+    ],
+  },
+  {
+    type: 'event',
+    name: 'FundsWithdrawn',
+    inputs: [
+      { indexed: true, name: 'beneficiary', type: 'address' },
+      { indexed: false, name: 'amount', type: 'uint256' }
     ],
   }
 ] as const;

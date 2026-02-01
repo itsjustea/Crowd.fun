@@ -13,6 +13,13 @@ interface Milestone {
 interface CreateCampaignModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSubmit?: (data: {
+    name: string;
+    beneficiary: Address;
+    duration: number;
+    fundingCap: string;
+    milestones?: Array<{ description: string; amount: string }>;
+  }) => void;
 }
 
 type DurationUnit = 'minutes' | 'hours' | 'days';

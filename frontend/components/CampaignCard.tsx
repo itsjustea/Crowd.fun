@@ -10,8 +10,8 @@ interface Campaign {
   address: Address;
   name: string;
   beneficiary: Address;
-  fundingCap: string;
-  totalRaised: string;
+  fundingCap: BigInt;
+  totalRaised: BigInt;
   deadline: number;
   finalized: boolean;
   isSuccessful: boolean;
@@ -42,13 +42,17 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
 
-  const raised = parseFloat(parseFloat(campaign.totalRaised) / 1e18 + '');
-  const goal = parseFloat(parseFloat(campaign.fundingCap) / 1e18 + '');
+  // const raised = parseFloat(parseFloat(campaign.totalRaised) / 1e18 + '');
+  // const goal = parseFloat(parseFloat(campaign.fundingCap) / 1e18 + '');
+  const raised = Number(campaign.totalRaised) / 1e18;
+  const goal = Number(campaign.fundingCap) / 1e18;
+
+
   const progress = (raised / goal) * 100;
   const campaignAddress = campaign.address as Address;
   
   // Calculate time remaining
-  const now = Math.floor(Date.now() / 1000);
+  const now = Math.ceil(Date.now() / 1000);
   const deadlineTimestamp = campaign.deadline;
   const isExpired = now > deadlineTimestamp;
   const timeRemaining = deadlineTimestamp * 1000 - Date.now();
@@ -235,7 +239,7 @@ export default function CampaignCard({ campaign, account }: CampaignCardProps) {
       </div>
 
       {/* Contribute Section */}
-      {isActive && account && !isCreator && (
+      {isActive && account && !isCreator && !isFullyFunded && (
         <div className="flex gap-3">
           <input
             type="number"

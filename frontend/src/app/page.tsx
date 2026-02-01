@@ -7,7 +7,7 @@ import CreateCampaignModal from '@/components/CreateCampaignModal';
 import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount } from 'wagmi';
-
+import { Address } from 'viem';
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,7 +16,7 @@ export default function Home() {
 
   const handleCreateCampaign = async (data: {
     name: string;
-    beneficiary: string;
+    beneficiary: Address;
     duration: number;
     fundingCap: string;
     milestones?: Array<{ description: string; amount: string }>;
