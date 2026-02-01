@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   // 3. Authorize factory to mint NFTs
   console.log("🔐 Authorizing factory to mint NFTs...");
-  const authorizeTx = await nftContract.authorizeCampaign(factoryAddress);
+  const authorizeTx = await nftContract.transferOwnership(factoryAddress);
   await authorizeTx.wait();
   console.log("✅ Factory authorized to mint NFTs");
   console.log("");
@@ -58,23 +58,19 @@ async function main(): Promise<void> {
   
   const campaignName = "Test Campaign with Governance";
   const beneficiary = deployer.address;
-  const duration = 30 * 24 * 60 * 60; // 30 days in seconds
-  const fundingCap = ethers.parseEther("10"); // 10 ETH
+  const duration = 5 * 60; // 30 days in seconds
+  const fundingCap = ethers.parseEther("0.01"); // 10 ETH
   
   // Define milestones with proper typing
   const milestones: Milestone[] = [
     {
       description: "Phase 1: Planning and Design",
-      amount: ethers.parseEther("3")
+      amount: ethers.parseEther("0.005")
     },
     {
       description: "Phase 2: Development",
-      amount: ethers.parseEther("4")
+      amount: ethers.parseEther("0.005")
     },
-    {
-      description: "Phase 3: Testing and Launch",
-      amount: ethers.parseEther("3")
-    }
   ];
   
   const createTx = await factory.createCampaign(

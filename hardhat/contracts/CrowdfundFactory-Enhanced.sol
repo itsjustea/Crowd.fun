@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./Crowdfund-Enhanced.sol";
+import "./Crowdfund.sol";
+
+
+/**
+ * @dev Minimal interface for ProofOfContribution — only the functions the
+ *      factory actually needs.  We avoid importing the full contract so that
+ *      the factory stays independent of its internal implementation.
+ */
+interface INFTAuthorizable {
+    function authorizeCampaign(address campaign) external;
+    function transferOwnership(address newOwner) external;
+}
 
 /**
  * @title CrowdfundFactory Enhanced
@@ -88,6 +99,10 @@ contract CrowdfundFactory {
         isCampaign[campaignAddress] = true;
         creatorCampaigns[msg.sender].push(campaignAddress);
         
+        if (_enableNFTRewards && nftContract != address(0)) {
+            INFTAuthorizable(nftContract).authorizeCampaign(campaignAddress);
+        }
+
         emit CampaignCreated(
             campaignAddress,
             msg.sender,

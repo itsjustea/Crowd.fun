@@ -1,8 +1,8 @@
 {
-  "nftContract": "0x6A5fE6cf850e6bb8aE21526e0b5CD9fa0AacBae7",
-  "factory": "0x5Dc6020BCc430266957Fb97392Bf4b4E338040C5",
-  "testCampaign": "0xD4cbEfc8EB8a40D8B8bd2785a1B919D3D67b497b",
+  "nftContract": "0x34a0d914D97fc74c6E340d60437A30827a01862e",
+  "factory": "0x09aeF043918232083229f5046863461373CEb598",
+  "testCampaign": "0xFca145e3E814bD1C83E2ae73BC20898a7a8EE451",
   "network": "arbitrum_sepolia",
   "deployer": "0x7Ad47dcf28E179E48c74B0d9e5C3E755Fa13eA41",
-  "timestamp": "2026-01-27T17:19:01.368Z"
+  "timestamp": "2026-02-01T16:17:59.416Z"
 }
