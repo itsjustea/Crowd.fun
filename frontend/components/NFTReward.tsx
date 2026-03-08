@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { usePublicClient, useAccount } from 'wagmi';
 import { formatEther, Address, Abi } from 'viem';
-import Image from 'next/image';
+
 
 interface NFTReward {
   eligible: boolean;
@@ -24,7 +24,7 @@ interface NFTMetadata {
 interface NFTRewardsProps {
   campaignAddress: Address;
   campaignAbi: Abi;
-  nftContractAddress: Address;
+  nftContractAddress: Address | null;  // Can be null if NFTs not enabled
   nftContractAbi: Abi;
   campaignName: string;
   isSuccessful: boolean;
@@ -52,10 +52,23 @@ export default function NFTRewards({
 
   useEffect(() => {
     fetchNFTReward();
-  }, [campaignAddress, userAddress]);
+  }, [campaignAddress, userAddress, publicClient]);
+
+  // Reset image loading state whenever new metadata arrives (e.g. after a refresh)
+  useEffect(() => {
+    if (nftMetadata) {
+      setImageLoading(true);
+    }
+  }, [nftMetadata]);
 
   const fetchNFTReward = async (): Promise<void> => {
     if (!userAddress || !publicClient) {
+      setLoading(false);
+      return;
+    }
+
+    // If no NFT contract address, NFTs aren't enabled
+    if (!nftContractAddress || nftContractAddress === '0x0000000000000000000000000000000000000000') {
       setLoading(false);
       return;
     }
@@ -66,7 +79,7 @@ export default function NFTRewards({
       const rewardInfo = await publicClient.readContract({
         address: campaignAddress,
         abi: campaignAbi,
-        functionName: 'getTokenId`',
+        functionName: 'getNFTRewardInfo',
         args: [userAddress],
       }) as readonly [boolean, boolean, bigint];
 
@@ -90,7 +103,7 @@ export default function NFTRewards({
   };
 
   const fetchNFTMetadata = async (tokenId: bigint): Promise<void> => {
-    if (!publicClient) return;
+    if (!publicClient || !nftContractAddress) return;
 
     try {
       // Get contribution data
@@ -139,6 +152,7 @@ export default function NFTRewards({
     });
   };
 
+  // Not connected
   if (!userAddress) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -148,7 +162,8 @@ export default function NFTRewards({
     );
   }
 
-  if (!nftRewardsEnabled) {
+  // NFTs not enabled for this campaign
+  if (!nftRewardsEnabled || !nftContractAddress || nftContractAddress === '0x0000000000000000000000000000000000000000') {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
         <h2 className="text-2xl font-bold text-white mb-4">🎨 NFT Rewards</h2>
@@ -157,6 +172,7 @@ export default function NFTRewards({
     );
   }
 
+  // Loading
   if (loading) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -166,6 +182,7 @@ export default function NFTRewards({
     );
   }
 
+  // Error state
   if (!nftReward) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -220,7 +237,7 @@ export default function NFTRewards({
         </div>
       )}
 
-      {/* Minted NFT */}
+      {/* Minted NFT with Full Metadata */}
       {nftReward.eligible && nftReward.minted && nftMetadata && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
           <div className="grid md:grid-cols-2 gap-6 p-6">
@@ -288,16 +305,16 @@ export default function NFTRewards({
                 </div>
               </div>
 
-              {/* View on OpenSea */}
+              {/* View on Explorer */}
               <div className="mt-6 pt-6 border-t border-gray-700">
                 <a
-                  href={`https://testnets.opensea.io/assets/sepolia/${nftContractAddress}/${nftMetadata.tokenId}`}
+                  href={`https://sepolia.arbiscan.io/nft/${nftContractAddress}/${nftMetadata.tokenId}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
                 >
-                  <span>🌊</span>
-                  View on OpenSea
+                  <span>🔍</span>
+                  View on Arbiscan
                   <span>↗</span>
                 </a>
               </div>
@@ -321,7 +338,7 @@ export default function NFTRewards({
         </div>
       )}
 
-      {/* Minted but No Metadata */}
+      {/* Minted but Metadata Loading Failed */}
       {nftReward.eligible && nftReward.minted && !nftMetadata && (
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <div className="text-center py-8">
@@ -330,9 +347,27 @@ export default function NFTRewards({
             <p className="text-gray-400 mb-4">
               Token ID: {nftReward.tokenId.toString()}
             </p>
-            <p className="text-gray-500 text-sm">
-              Loading metadata...
+            <p className="text-gray-500 text-sm mb-4">
+              Metadata is loading...
             </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={fetchNFTReward}
+                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                🔄 Retry
+              </button>
+              <a
+                href={`https://sepolia.arbiscan.io/nft/${nftContractAddress}/${nftReward.tokenId.toString()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <span>🔍</span>
+                View on Arbiscan
+                <span>↗</span>
+              </a>
+            </div>
           </div>
         </div>
       )}

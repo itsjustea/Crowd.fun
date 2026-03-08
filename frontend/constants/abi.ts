@@ -3,6 +3,13 @@ export const CROWDFUND_ABI = [
   // ========== VIEW FUNCTIONS ==========
   {
     type: 'function',
+    name: 'getCampaignsByCreator',
+    inputs: [{ name: '_creator', type: 'address' }],
+    outputs: [{ type: 'address[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'getCampaignDetails',
     inputs: [],
     outputs: [
@@ -98,6 +105,12 @@ export const CROWDFUND_ABI = [
     name: 'getTotalContributors',
     inputs: [],
     outputs: [{ type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  { type: 'function',
+    name: 'getNFTContractForCampaign',
+    inputs: [{ name: '_campaign', type: 'address' }],
+    outputs: [{ type: 'address' }],
     stateMutability: 'view',
   },
   

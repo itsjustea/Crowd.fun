@@ -2,43 +2,23 @@
 pragma solidity ^0.8.20;
 
 import "./Crowdfund.sol";
-
-
-/**
- * @dev Minimal interface for ProofOfContribution — only the functions the
- *      factory actually needs.  We avoid importing the full contract so that
- *      the factory stays independent of its internal implementation.
- */
-interface INFTAuthorizable {
-    function authorizeCampaign(address campaign) external;
-    function transferOwnership(address newOwner) external;
-}
+import "./ProofOfContribution.sol";
 
 /**
- * @title CrowdfundFactory Enhanced
- * @dev Factory contract to create and manage crowdfunding campaigns
- *      Now supports governance and update features
+ * @title CrowdfundFactory - Per-Campaign NFT Architecture
+ * @dev Each campaign gets its own dedicated ProofOfContribution NFT contract
  */
 contract CrowdfundFactory {
-    // Array to store all campaign addresses
     address[] public campaigns;
-    
-    // Mapping to check if an address is a valid campaign
     mapping(address => bool) public isCampaign;
-    
-    // Mapping from creator to their campaigns
     mapping(address => address[]) public creatorCampaigns;
-    
-    // NFT contract address (same for all campaigns)
-    address public nftContract;
-    
-    // Owner of the factory
+    mapping(address => address) public campaignNFTContract;
     address public owner;
     
-    // Events
     event CampaignCreated(
         address indexed campaign,
         address indexed creator,
+        address indexed nftContract,
         string name,
         uint256 fundingCap,
         uint256 deadline,
@@ -46,28 +26,15 @@ contract CrowdfundFactory {
         bool governanceEnabled
     );
     
-    event NFTContractUpdated(address indexed oldContract, address indexed newContract);
-    
     modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this");
+        require(msg.sender == owner, "Only owner");
         _;
     }
     
-    constructor(address _nftContract) {
+    constructor() {
         owner = msg.sender;
-        nftContract = _nftContract;
     }
     
-    /**
-     * @dev Create a new crowdfunding campaign with optional governance
-     * @param _name Campaign name
-     * @param _beneficiary Address to receive funds
-     * @param _duration Campaign duration in seconds
-     * @param _fundingCap Funding goal in wei
-     * @param _milestones Array of milestones
-     * @param _enableNFTRewards Whether to enable NFT rewards
-     * @param _enableGovernance Whether to enable contributor governance
-     */
     function createCampaign(
         string memory _name,
         address _beneficiary,
@@ -76,11 +43,17 @@ contract CrowdfundFactory {
         Crowdfund.MilestoneInput[] memory _milestones,
         bool _enableNFTRewards,
         bool _enableGovernance
-    ) external returns (address) {
-        // Determine NFT contract address
-        address nftAddress = _enableNFTRewards ? nftContract : address(0);
+    ) external returns (address campaignAddress, address nftAddress) {
         
-        // Create new campaign contract
+        // Deploy NFT contract if requested
+        if (_enableNFTRewards) {
+            ProofOfContribution nft = new ProofOfContribution();
+            nftAddress = address(nft);
+        } else {
+            nftAddress = address(0);
+        }
+        
+        // Deploy campaign contract
         Crowdfund campaign = new Crowdfund(
             _name,
             _beneficiary,
@@ -92,20 +65,26 @@ contract CrowdfundFactory {
             _enableGovernance
         );
         
-        address campaignAddress = address(campaign);
+        campaignAddress = address(campaign);
         
-        // Register the campaign
+        // Transfer NFT ownership to campaign
+        if (_enableNFTRewards) {
+            ProofOfContribution(nftAddress).transferOwnership(campaignAddress);
+        }
+        
+        // Register campaign
         campaigns.push(campaignAddress);
         isCampaign[campaignAddress] = true;
         creatorCampaigns[msg.sender].push(campaignAddress);
         
-        if (_enableNFTRewards && nftContract != address(0)) {
-            INFTAuthorizable(nftContract).authorizeCampaign(campaignAddress);
+        if (_enableNFTRewards) {
+            campaignNFTContract[campaignAddress] = nftAddress;
         }
-
+        
         emit CampaignCreated(
             campaignAddress,
             msg.sender,
+            nftAddress,
             _name,
             _fundingCap,
             block.timestamp + _duration,
@@ -113,43 +92,25 @@ contract CrowdfundFactory {
             _enableGovernance
         );
         
-        return campaignAddress;
+        return (campaignAddress, nftAddress);
     }
     
-    /**
-     * @dev Get all campaigns
-     */
     function getAllCampaigns() external view returns (address[] memory) {
         return campaigns;
     }
     
-    /**
-     * @dev Get total number of campaigns
-     */
     function getCampaignCount() external view returns (uint256) {
         return campaigns.length;
     }
     
-    /**
-     * @dev Get campaigns created by a specific address
-     */
     function getCampaignsByCreator(address _creator) external view returns (address[] memory) {
         return creatorCampaigns[_creator];
     }
     
-    /**
-     * @dev Update NFT contract address (only owner)
-     */
-    function updateNFTContract(address _newNFTContract) external onlyOwner {
-        require(_newNFTContract != address(0), "Invalid NFT contract address");
-        address oldContract = nftContract;
-        nftContract = _newNFTContract;
-        emit NFTContractUpdated(oldContract, _newNFTContract);
+    function getNFTContractForCampaign(address _campaign) external view returns (address) {
+        return campaignNFTContract[_campaign];
     }
     
-    /**
-     * @dev Check if address is a valid campaign
-     */
     function isValidCampaign(address _campaign) external view returns (bool) {
         return isCampaign[_campaign];
     }

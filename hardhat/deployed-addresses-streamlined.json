@@ -1,0 +1,10 @@
+{
+  "factory": "0x0c546bE57699040d12Fe4c65D5CB50bB0740D41e",
+  "testCampaign": "0xc6a93C5489bEAdf96B5e67f9CEBe0d7629755320",
+  "testCampaignNFT": "0x32d9688aA6bDfAc089e4cCcC146f2d08D397d644",
+  "network": "arbitrum_sepolia",
+  "deployer": "0x7Ad47dcf28E179E48c74B0d9e5C3E755Fa13eA41",
+  "timestamp": "2026-02-04T14:01:09.771Z",
+  "governanceType": "ONE-PERSON-ONE-VOTE",
+  "version": "streamlined-v1"
+}

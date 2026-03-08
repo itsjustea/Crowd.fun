@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 // Interface for ProofOfContribution NFT contract
 interface IProofOfContribution {
@@ -16,13 +16,15 @@ interface IProofOfContribution {
     
     function hasNFT(address campaign, address contributor) external view returns (bool);
     function getTokenId(address campaign, address contributor) external view returns (uint256);
+    function transferOwnership(address newOwner) external;
 }
+
 /**
- * @title Crowdfund - One-Person-One-Vote with Fixed Resolution
- * @notice FIXED: Votes only resolve when ALL have voted OR deadline passes
- * @dev No premature auto-resolution - fair voting for everyone
+ * @title Crowdfund - Streamlined for Size Optimization
+ * @notice Campaign updates removed - use events + off-chain storage instead
+ * @dev Each campaign has its own dedicated NFT contract
  */
-contract Crowdfund is ReentrancyGuard {
+contract Crowdfund is ReentrancyGuard, Ownable {
     // ========== STATE VARIABLES ==========
     
     string public name;
@@ -69,20 +71,12 @@ contract Crowdfund is ReentrancyGuard {
     
     // Governance constants
     uint256 public constant VOTING_PERIOD = 7 days;
-    uint256 public constant APPROVAL_THRESHOLD = 60; // 60% approval required
-    uint256 public constant MIN_PARTICIPATION = 30;  // 30% participation required
+    uint256 public constant APPROVAL_THRESHOLD = 60;
+    uint256 public constant MIN_PARTICIPATION = 30;
     
-    // ========== CAMPAIGN UPDATES ==========
-    
-    struct Update {
-        string title;
-        string ipfsHash;
-        uint256 timestamp;
-        uint256 milestoneId;
-    }
-    
-    Update[] public updates;
-    mapping(uint256 => uint256[]) public milestoneUpdates;
+    // NFT minting tracking
+    mapping(address => bool) public nftMinted;
+    bool public fundsWithdrawn;
     
     // ========== EVENTS ==========
     
@@ -91,31 +85,45 @@ contract Crowdfund is ReentrancyGuard {
     event RefundClaimed(address indexed contributor, uint256 amount);
     event MilestoneFundsReleased(uint256 indexed milestoneId, uint256 amount);
     event NFTRewarded(address indexed contributor, uint256 tokenId);
+    event NFTMintingFailed(address indexed contributor, string reason);
+    event FundsWithdrawn(address indexed beneficiary, uint256 amount);
     
-    event UpdatePosted(uint256 indexed updateId, string title, uint256 timestamp);
     event MilestoneVoteStarted(uint256 indexed milestoneId, uint256 votingDeadline);
     event VoteCast(uint256 indexed milestoneId, address indexed voter, bool support);
     event MilestoneVoteResolved(uint256 indexed milestoneId, bool approved);
     
+    // Campaign update event (replaces on-chain storage)
+    event UpdatePosted(
+        uint256 indexed milestoneId,
+        string title,
+        string ipfsHash,
+        uint256 timestamp
+    );
+    
     // ========== MODIFIERS ==========
     
     modifier onlyCreator() {
-        require(msg.sender == creator, "Only creator can call this");
+        require(msg.sender == creator, "Only creator");
         _;
     }
     
     modifier onlyContributor() {
-        require(contributions[msg.sender] > 0, "Only contributors can call this");
+        require(contributions[msg.sender] > 0, "Only contributors");
         _;
     }
     
     modifier campaignActive() {
-        require(!finalized, "Campaign already finalized");
-        require(block.timestamp < deadline, "Campaign deadline passed");
+        require(!finalized, "Already finalized");
+        require(block.timestamp < deadline, "Deadline passed");
         _;
     }
     
     // ========== CONSTRUCTOR ==========
+    
+    struct MilestoneInput {
+        string description;
+        uint256 amount;
+    }
     
     constructor(
         string memory _name,
@@ -126,10 +134,10 @@ contract Crowdfund is ReentrancyGuard {
         MilestoneInput[] memory _milestones,
         address _nftContract,
         bool _enableGovernance
-    ) {
+    ) Ownable(msg.sender) {
         require(_beneficiary != address(0), "Invalid beneficiary");
-        require(_fundingCap > 0, "Funding cap must be greater than 0");
-        require(_duration > 0, "Duration must be greater than 0");
+        require(_fundingCap > 0, "Funding cap must be > 0");
+        require(_duration > 0, "Duration must be > 0");
         
         name = _name;
         beneficiary = _beneficiary;
@@ -150,16 +158,11 @@ contract Crowdfund is ReentrancyGuard {
         }
     }
     
-    struct MilestoneInput {
-        string description;
-        uint256 amount;
-    }
-    
     // ========== CONTRIBUTION FUNCTIONS ==========
     
     function contribute() external payable campaignActive nonReentrant {
-        require(msg.value > 0, "Contribution must be greater than 0");
-        require(totalFundsRaised + msg.value <= fundingCap, "Exceeds funding cap");
+        require(msg.value > 0, "Must contribute > 0");
+        require(totalFundsRaised + msg.value <= fundingCap, "Exceeds cap");
         
         if (contributions[msg.sender] == 0) {
             contributors.push(msg.sender);
@@ -174,7 +177,7 @@ contract Crowdfund is ReentrancyGuard {
     
     function finalize() external nonReentrant {
         require(!finalized, "Already finalized");
-        require(block.timestamp >= deadline, "Campaign not ended yet");
+        require(block.timestamp >= deadline, "Not ended yet");
         
         finalized = true;
         successful = totalFundsRaised >= fundingCap;
@@ -187,11 +190,11 @@ contract Crowdfund is ReentrancyGuard {
     }
     
     function claimRefund() external nonReentrant {
-        require(finalized, "Campaign not finalized");
-        require(!successful, "Campaign was successful");
+        require(finalized, "Not finalized");
+        require(!successful, "Was successful");
         
         uint256 contribution = contributions[msg.sender];
-        require(contribution > 0, "No contribution to refund");
+        require(contribution > 0, "No contribution");
         
         contributions[msg.sender] = 0;
         payable(msg.sender).transfer(contribution);
@@ -201,36 +204,20 @@ contract Crowdfund is ReentrancyGuard {
     
     // ========== NFT DISTRIBUTION ==========
     
-   
-    
-    // NFT minting tracking
-    mapping(address => bool) public nftMinted;
-    
-    /**
-     * @dev Distribute NFTs to all contributors
-     * @notice Called automatically when campaign is finalized successfully
-     */
     function _distributeNFTs() private {
-        if (!nftRewardsEnabled || address(nftContract) == address(0)) {
-            return;
-        }
+        if (!nftRewardsEnabled || address(nftContract) == address(0)) return;
         
         IProofOfContribution nft = IProofOfContribution(address(nftContract));
         
-        // Mint NFT for each contributor
         for (uint256 i = 0; i < contributors.length; i++) {
             address contributor = contributors[i];
-            
-            // Skip if already minted
-            if (nftMinted[contributor]) {
-                continue;
-            }
+            if (nftMinted[contributor]) continue;
             
             try nft.mintContribution(
                 contributor,
                 contributions[contributor],
                 name,
-                i + 1 // Contributor number (1-indexed)
+                i + 1
             ) returns (uint256 tokenId) {
                 nftMinted[contributor] = true;
                 emit NFTRewarded(contributor, tokenId);
@@ -242,9 +229,6 @@ contract Crowdfund is ReentrancyGuard {
         }
     }
     
-    /**
-     * @dev Get NFT reward info for a contributor
-     */
     function getNFTRewardInfo(address contributor) external view returns (
         bool eligible,
         bool minted,
@@ -260,31 +244,26 @@ contract Crowdfund is ReentrancyGuard {
             } catch {
                 tokenId = 0;
             }
-        } else {
-            tokenId = 0;
         }
         
         return (eligible, minted, tokenId);
     }
     
-    // New event for NFT minting failures
-    event NFTMintingFailed(address indexed contributor, string reason);
-    
     // ========== MILESTONE FUNCTIONS ==========
     
     function releaseMilestoneFunds(uint256 _milestoneId) external onlyCreator nonReentrant {
-        require(finalized && successful, "Campaign not successful");
-        require(_milestoneId < milestones.length, "Invalid milestone ID");
+        require(finalized && successful, "Not successful");
+        require(_milestoneId < milestones.length, "Invalid ID");
         
         Milestone storage milestone = milestones[_milestoneId];
-        require(!milestone.fundsReleased, "Funds already released");
+        require(!milestone.fundsReleased, "Already released");
         
         if (governanceEnabled) {
             MilestoneVote storage vote = milestoneVotes[_milestoneId];
-            require(vote.resolved, "Vote not resolved");
-            require(vote.approved, "Milestone not approved");
+            require(vote.resolved, "Not resolved");
+            require(vote.approved, "Not approved");
         } else {
-            require(milestone.completed, "Milestone not completed");
+            require(milestone.completed, "Not completed");
         }
         
         milestone.fundsReleased = true;
@@ -293,23 +272,15 @@ contract Crowdfund is ReentrancyGuard {
         emit MilestoneFundsReleased(_milestoneId, milestone.amount);
     }
     
-    /**
-     * @dev Withdraw all funds to beneficiary for campaigns with no milestones
-     * @notice Only callable by creator, only when campaign is successful and has no milestones
-     * @notice Funds can only be withdrawn once
-     */
-    bool public fundsWithdrawn;
-    event FundsWithdrawn(address indexed beneficiary, uint256 amount);
-
     function withdrawFunds() external onlyCreator nonReentrant {
-        require(finalized, "Campaign not finalized");
-        require(successful, "Campaign was not successful");
-        require(milestones.length == 0, "Use releaseMilestoneFunds for milestone-based campaigns");
-        require(!fundsWithdrawn, "Funds already withdrawn");
+        require(finalized, "Not finalized");
+        require(successful, "Not successful");
+        require(milestones.length == 0, "Use releaseMilestoneFunds");
+        require(!fundsWithdrawn, "Already withdrawn");
 
         fundsWithdrawn = true;
         uint256 amount = address(this).balance;
-        require(amount > 0, "No funds to withdraw");
+        require(amount > 0, "No funds");
 
         payable(beneficiary).transfer(amount);
         emit FundsWithdrawn(beneficiary, amount);
@@ -319,35 +290,29 @@ contract Crowdfund is ReentrancyGuard {
         return milestones;
     }
     
-    // ========== GOVERNANCE FUNCTIONS - FIXED ==========
+    // ========== GOVERNANCE ==========
     
     function completeMilestone(uint256 _milestoneId) external onlyCreator {
-        require(governanceEnabled, "Governance is not enabled");
-        require(finalized && successful, "Campaign not successful");
-        require(_milestoneId < milestones.length, "Invalid milestone ID");
-        require(!milestones[_milestoneId].completed, "Milestone already completed");
+        require(governanceEnabled, "Governance disabled");
+        require(finalized && successful, "Not successful");
+        require(_milestoneId < milestones.length, "Invalid ID");
+        require(!milestones[_milestoneId].completed, "Already completed");
         
         MilestoneVote storage vote = milestoneVotes[_milestoneId];
-        require(vote.votingDeadline == 0, "Voting already started");
+        require(vote.votingDeadline == 0, "Voting started");
         
         vote.votingDeadline = block.timestamp + VOTING_PERIOD;
-        
         emit MilestoneVoteStarted(_milestoneId, vote.votingDeadline);
     }
     
-    /**
-     * @dev Vote on milestone completion (ONE PERSON = ONE VOTE)
-     * @dev FIXED: No auto-resolution - waits for manual resolve
-     */
     function voteOnMilestone(uint256 _milestoneId, bool _support) external onlyContributor {
-        require(governanceEnabled, "Governance is not enabled");
-        require(_milestoneId < milestones.length, "Invalid milestone ID");
-        require(!milestones[_milestoneId].completed, "Milestone already completed");
-        require(!milestoneVotes[_milestoneId].resolved, "Voting already concluded");
-        require(block.timestamp <= milestoneVotes[_milestoneId].votingDeadline, "Voting period ended");
+        require(governanceEnabled, "Governance disabled");
+        require(_milestoneId < milestones.length, "Invalid ID");
+        require(!milestones[_milestoneId].completed, "Already completed");
+        require(!milestoneVotes[_milestoneId].resolved, "Already resolved");
+        require(block.timestamp <= milestoneVotes[_milestoneId].votingDeadline, "Ended");
         require(!milestoneVotes[_milestoneId].hasVoted[msg.sender], "Already voted");
         
-        // Each person gets exactly 1 vote
         if (_support) {
             milestoneVotes[_milestoneId].votesFor += 1;
         } else {
@@ -359,72 +324,44 @@ contract Crowdfund is ReentrancyGuard {
         
         emit VoteCast(_milestoneId, msg.sender, _support);
         
-        // FIXED: Only auto-resolve if ALL contributors have voted
         _tryAutoResolve(_milestoneId);
     }
     
-    /**
-     * @dev Resolve milestone vote
-     * @dev Can be called by anyone after voting deadline OR when all have voted
-     */
     function resolveMilestoneVote(uint256 _milestoneId) external {
-        require(governanceEnabled, "Governance is not enabled");
-        require(_milestoneId < milestones.length, "Invalid milestone ID");
+        require(governanceEnabled, "Governance disabled");
+        require(_milestoneId < milestones.length, "Invalid ID");
         require(!milestoneVotes[_milestoneId].resolved, "Already resolved");
         
         MilestoneVote storage vote = milestoneVotes[_milestoneId];
         uint256 totalVotes = vote.votesFor + vote.votesAgainst;
-        uint256 totalContributors = contributors.length;
         
-        // Can resolve if:
-        // 1. Voting deadline has passed, OR
-        // 2. All contributors have voted
         require(
-            block.timestamp > vote.votingDeadline || totalVotes == totalContributors,
-            "Voting still active - not all have voted and deadline not passed"
+            block.timestamp > vote.votingDeadline || totalVotes == contributors.length,
+            "Still active"
         );
         
         _resolveVote(_milestoneId);
     }
     
-    /**
-     * @dev FIXED: Only auto-resolve when ALL contributors have voted
-     * @dev This prevents premature resolution when just 1 or 2 people vote
-     */
     function _tryAutoResolve(uint256 _milestoneId) private {
         MilestoneVote storage vote = milestoneVotes[_milestoneId];
-        
         uint256 totalVotes = vote.votesFor + vote.votesAgainst;
-        uint256 totalContributors = contributors.length;
         
-        // ONLY auto-resolve if ALL contributors have voted
-        // This ensures fair voting - everyone gets a chance
-        if (totalVotes == totalContributors) {
+        if (totalVotes == contributors.length) {
             _resolveVote(_milestoneId);
         }
-        
-        // Otherwise, voting continues until deadline
-        // Then anyone can call resolveMilestoneVote()
     }
     
-    /**
-     * @dev Internal function to resolve vote
-     */
     function _resolveVote(uint256 _milestoneId) private {
         MilestoneVote storage vote = milestoneVotes[_milestoneId];
-        
         uint256 totalVotes = vote.votesFor + vote.votesAgainst;
-        uint256 totalContributors = contributors.length;
+        uint256 minVotes = (contributors.length * MIN_PARTICIPATION) / 100;
         
-        // Check minimum participation (30% of contributors)
-        uint256 minVotes = (totalContributors * MIN_PARTICIPATION) / 100;
-        require(totalVotes >= minVotes, "Insufficient participation - need 30% of contributors");
+        require(totalVotes >= minVotes, "Insufficient participation");
         
-        // Calculate approval percentage based on votes cast
-        uint256 approvalPercentage = (vote.votesFor * 100) / totalVotes;
-        
+        uint256 approvalPct = (vote.votesFor * 100) / totalVotes;
         vote.resolved = true;
-        vote.approved = approvalPercentage >= APPROVAL_THRESHOLD;
+        vote.approved = approvalPct >= APPROVAL_THRESHOLD;
         
         if (vote.approved) {
             milestones[_milestoneId].completed = true;
@@ -463,46 +400,21 @@ contract Crowdfund is ReentrancyGuard {
         governanceEnabled = !governanceEnabled;
     }
     
-    // ========== CAMPAIGN UPDATES ==========
+    // ========== CAMPAIGN UPDATES (EVENT-BASED) ==========
     
+    /**
+     * @dev Post a campaign update (emits event, no on-chain storage)
+     * @notice Store full content in IPFS, emit hash here for indexing
+     * @param _title Update title
+     * @param _ipfsHash IPFS hash of full update content
+     * @param _milestoneId Associated milestone (type(uint256).max for general updates)
+     */
     function postUpdate(
         string memory _title,
         string memory _ipfsHash,
         uint256 _milestoneId
     ) external onlyCreator {
-        uint256 updateId = updates.length;
-        
-        updates.push(Update({
-            title: _title,
-            ipfsHash: _ipfsHash,
-            timestamp: block.timestamp,
-            milestoneId: _milestoneId
-        }));
-        
-        if (_milestoneId != type(uint256).max) {
-            milestoneUpdates[_milestoneId].push(updateId);
-        }
-        
-        emit UpdatePosted(updateId, _title, block.timestamp);
-    }
-    
-    function getUpdateCount() external view returns (uint256) {
-        return updates.length;
-    }
-    
-    function getUpdate(uint256 _updateId) external view returns (
-        string memory title,
-        string memory ipfsHash,
-        uint256 timestamp,
-        uint256 milestoneId
-    ) {
-        require(_updateId < updates.length, "Invalid update ID");
-        Update storage update = updates[_updateId];
-        return (update.title, update.ipfsHash, update.timestamp, update.milestoneId);
-    }
-    
-    function getMilestoneUpdates(uint256 _milestoneId) external view returns (uint256[] memory) {
-        return milestoneUpdates[_milestoneId];
+        emit UpdatePosted(_milestoneId, _title, _ipfsHash, block.timestamp);
     }
     
     // ========== VIEW FUNCTIONS ==========
@@ -517,8 +429,7 @@ contract Crowdfund is ReentrancyGuard {
         bool _successful,
         address _creator,
         uint256 _milestoneCount,
-        bool _governanceEnabled,
-        uint256 _updateCount
+        bool _governanceEnabled
     ) {
         return (
             name,
@@ -530,8 +441,7 @@ contract Crowdfund is ReentrancyGuard {
             successful,
             creator,
             milestones.length,
-            governanceEnabled,
-            updates.length
+            governanceEnabled
         );
     }
 }
