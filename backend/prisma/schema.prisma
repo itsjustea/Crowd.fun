@@ -1,0 +1,189 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+// ==================== CAMPAIGN ====================
+model Campaign {
+  id                String   @id @default(uuid())
+  address           String   @unique // Contract address
+  
+  // Basic Info
+  name              String
+  beneficiary       String
+  creator           String
+  fundingCap        String   // Store as string to preserve precision
+  deadline          DateTime
+  createdAt         DateTime @default(now())
+  
+  // Status
+  finalized         Boolean  @default(false)
+  successful        Boolean  @default(false)
+  totalFundsRaised  String   @default("0")
+  
+  // Features
+  governanceEnabled Boolean  @default(false)
+  nftRewardsEnabled Boolean  @default(false)
+  nftContractAddress String?
+  
+  // Metadata
+  updateCount       Int      @default(0)
+  contributorCount  Int      @default(0)
+  
+  // Indexing
+  blockNumber       BigInt
+  transactionHash   String
+  lastSyncedBlock   BigInt?
+  lastSyncedAt      DateTime?
+  
+  // Relations
+  milestones        Milestone[]
+  contributions     Contribution[]
+  updates           CampaignUpdate[]
+  votes             MilestoneVote[]
+  
+  @@index([creator])
+  @@index([finalized])
+  @@index([successful])
+  @@index([deadline])
+  @@index([createdAt])
+}
+
+// ==================== MILESTONE ====================
+model Milestone {
+  id              String    @id @default(uuid())
+  
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  milestoneIndex  Int       // 0-indexed position
+  description     String
+  amount          String
+  
+  completed       Boolean   @default(false)
+  fundsReleased   Boolean   @default(false)
+  
+  // Voting (if governance enabled)
+  votingStarted   Boolean   @default(false)
+  votingDeadline  DateTime?
+  votesFor        Int       @default(0)
+  votesAgainst    Int       @default(0)
+  voteResolved    Boolean   @default(false)
+  voteApproved    Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  
+  votes           MilestoneVote[]
+  
+  @@unique([campaignId, milestoneIndex])
+  @@index([campaignId])
+}
+
+// ==================== CONTRIBUTION ====================
+model Contribution {
+  id              String    @id @default(uuid())
+  
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  contributor     String
+  amount          String
+  
+  // NFT Info
+  nftMinted       Boolean   @default(false)
+  nftTokenId      String?
+  
+  // Transaction
+  blockNumber     BigInt
+  transactionHash String    @unique
+  timestamp       DateTime
+  
+  @@unique([campaignId, contributor])
+  @@index([campaignId])
+  @@index([contributor])
+  @@index([timestamp])
+}
+
+// ==================== CAMPAIGN UPDATE ====================
+model CampaignUpdate {
+  id              String    @id @default(uuid())
+  
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  title           String
+  ipfsHash        String
+  milestoneId     String?   // null if general update
+  
+  // Transaction
+  blockNumber     BigInt
+  transactionHash String    @unique
+  timestamp       DateTime
+  
+  @@index([campaignId])
+  @@index([timestamp])
+}
+
+// ==================== MILESTONE VOTE ====================
+model MilestoneVote {
+  id              String    @id @default(uuid())
+  
+  campaignId      String
+  campaign        Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  milestoneId     String
+  milestone       Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  
+  voter           String
+  support         Boolean   // true = for, false = against
+  
+  // Transaction
+  blockNumber     BigInt
+  transactionHash String    @unique
+  timestamp       DateTime
+  
+  @@unique([milestoneId, voter])
+  @@index([campaignId])
+  @@index([milestoneId])
+  @@index([voter])
+}
+
+// ==================== ANALYTICS ====================
+model DailyStats {
+  id                    String   @id @default(uuid())
+  
+  date                  DateTime @unique
+  
+  // Campaign Stats
+  totalCampaigns        Int      @default(0)
+  activeCampaigns       Int      @default(0)
+  successfulCampaigns   Int      @default(0)
+  failedCampaigns       Int      @default(0)
+  
+  // Financial Stats
+  totalRaised           String   @default("0")
+  totalRaisedUSD        String?  // If you track USD conversion
+  
+  // Activity Stats
+  newCampaigns          Int      @default(0)
+  newContributions      Int      @default(0)
+  newContributors       Int      @default(0)
+  
+  @@index([date])
+}
+
+// ==================== SYNC STATE ====================
+model SyncState {
+  id              String   @id @default(uuid())
+  
+  contractAddress String   @unique
+  lastBlock       BigInt
+  lastSyncedAt    DateTime @updatedAt
+  
+  @@index([contractAddress])
+}
