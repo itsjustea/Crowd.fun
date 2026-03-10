@@ -2,86 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import CampaignCard from '@/components/CampaignCard';
+import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
 import { useAccount } from 'wagmi';
-import { Address } from 'viem';
-
-// API base URL - adjust as needed
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-interface Campaign {
-  address: Address;
-  name: string;
-  creator: Address;
-  beneficiary: Address;
-  fundingCap: string;
-  totalFundsRaised: string;
-  deadline: number;
-  finalized: boolean;
-  successful: boolean;
-}
 
 export default function ExplorePage() {
+  const { campaigns, loading, refreshCampaigns } = useCrowdfundFactory();
   const { address } = useAccount();
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'successful' | 'ended'>('all');
-  const [error, setError] = useState<string | null>(null);
 
-  // Fetch campaigns from API
-  const fetchCampaigns = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Build query params based on filter
-      let url = `${API_URL}/api/campaigns?limit=100`;
-      
-      if (filter === 'active') {
-        url += '&status=active';
-      } else if (filter === 'successful') {
-        url += '&status=successful';
-      } else if (filter === 'ended') {
-        url += '&status=ended';
-      }
-
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch campaigns');
-      }
-
-      const data = await response.json();
-      setCampaigns(data.campaigns || []);
-    } catch (err) {
-      console.error('Error fetching campaigns:', err);
-      setError('Failed to load campaigns. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch on mount and when filter changes
   useEffect(() => {
-    fetchCampaigns();
-  }, [filter]);
+    refreshCampaigns();
+  }, []);
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchCampaigns();
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [filter]);
-
-  // Filter campaigns client-side (backup if API filter doesn't work)
+  // Filter campaigns based on selected filter
   const filteredCampaigns = campaigns.filter(campaign => {
     const now = Date.now();
-    const deadline = new Date(campaign.deadline).getTime();
+    const deadline = Number(campaign.deadline) * 1000;
     
     if (filter === 'all') return true;
     if (filter === 'active') return !campaign.finalized && now < deadline;
-    if (filter === 'successful') return campaign.finalized && campaign.successful;
+    if (filter === 'successful') return campaign.finalized && campaign.isSuccessful;
     if (filter === 'ended') return now > deadline || campaign.finalized;
     return true;
   });
@@ -131,32 +71,10 @@ export default function ExplorePage() {
           <h2 className="text-2xl font-bold text-white">
             {filter === 'all' ? 'All Campaigns' : `${filter.charAt(0).toUpperCase() + filter.slice(1)} Campaigns`}
           </h2>
-          <div className="flex items-center gap-3">
-            <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-white/70 text-sm font-semibold">
-              {filteredCampaigns.length} {filteredCampaigns.length === 1 ? 'Campaign' : 'Campaigns'}
-            </div>
-            <button
-              onClick={fetchCampaigns}
-              disabled={loading}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white/70 text-sm font-semibold transition-all disabled:opacity-50"
-            >
-              {loading ? '↻ Refreshing...' : '↻ Refresh'}
-            </button>
+          <div className="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-white/70 text-sm font-semibold">
+            {filteredCampaigns.length} {filteredCampaigns.length === 1 ? 'Campaign' : 'Campaigns'}
           </div>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
-            <p className="font-semibold">⚠️ {error}</p>
-            <button
-              onClick={fetchCampaigns}
-              className="mt-2 text-sm underline hover:no-underline"
-            >
-              Try again
-            </button>
-          </div>
-        )}
 
         {/* Campaigns Grid */}
         {loading ? (
@@ -181,28 +99,14 @@ export default function ExplorePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCampaigns.map((campaign) => {
-                const deadlineTimestamp = Math.floor(new Date(campaign.deadline).getTime() / 1000);
-
-                return (
-                <CampaignCard
-                    key={campaign.address}
-                    campaign={{
-                    address: campaign.address as `0x${string}`,
-                    name: campaign.name,
-                    creator: campaign.creator as `0x${string}`,
-                    beneficiary: campaign.beneficiary as `0x${string}`,
-                    fundingCap: BigInt(campaign.fundingCap),
-                    totalRaised: BigInt(campaign.totalFundsRaised),
-                    deadline: deadlineTimestamp,
-                    finalized: campaign.finalized,
-                    isSuccessful: campaign.successful,
-                    }}
-                    account={address || null}
-                />
-                );
-            })}
-            </div>
+            {filteredCampaigns.map((campaign) => (
+              <CampaignCard
+                key={campaign.address}
+                campaign={campaign}
+                account={address || null}
+              />
+            ))}
+          </div>
         )}
       </main>
     </div>
