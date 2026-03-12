@@ -13,17 +13,17 @@ export const CROWDFUND_ABI = [
     name: 'getCampaignDetails',
     inputs: [],
     outputs: [
-      { type: 'string' },   // name
-      { type: 'address' },  // beneficiary
-      { type: 'uint256' },  // fundingCap
-      { type: 'uint256' },  // deadline
-      { type: 'uint256' },  // totalFundsRaised
-      { type: 'bool' },     // finalized
-      { type: 'bool' },     // successful
-      { type: 'address' },  // creator
-      { type: 'uint256' },  // milestoneCount
-      { type: 'bool' },     // governanceEnabled
-      { type: 'uint256' }   // updateCount
+      { type: 'string', name: '_name' },               // name
+      { type: 'address', name: '_beneficiary' },       // beneficiary
+      { type: 'uint256', name: '_fundingCap' },        // fundingCap
+      { type: 'uint256', name: '_deadline' },          // deadline
+      { type: 'uint256', name: '_totalFundsRaised' },  // totalFundsRaised
+      { type: 'bool', name: '_finalized' },           // finalized
+      { type: 'bool', name: '_successful' },          // successful
+      { type: 'address', name: '_creator' },          // creator
+      { type: 'uint256', name: '_milestoneCount' },   // milestoneCount
+      { type: 'bool', name: '_governanceEnabled' },   // governanceEnabled
+      { type: 'bool', name: '_nftRewardsEnabled' },   // nftRewardsEnabled
     ],
     stateMutability: 'view',
   },
@@ -113,7 +113,14 @@ export const CROWDFUND_ABI = [
     outputs: [{ type: 'address' }],
     stateMutability: 'view',
   },
-  
+  {
+    type: 'function',
+    name: 'nftcontract',
+    inputs: [],
+    outputs: [{ type: 'address' }],
+    stateMutability: 'view',
+  },
+
   // ========== STATE-CHANGING FUNCTIONS ==========
   {
     type: 'function',
@@ -191,6 +198,13 @@ export const CROWDFUND_ABI = [
     inputs: [],
     outputs: [{ type: 'bool' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'claimNFT',
+    inputs: [],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   
   // ========== EVENTS ==========

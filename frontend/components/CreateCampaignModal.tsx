@@ -4,6 +4,8 @@ import { useWalletClient, usePublicClient, useAccount } from 'wagmi';
 import { parseEther } from 'viem';
 import type { Address, Abi } from 'viem';
 import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface Milestone {
   description: string;
@@ -19,6 +21,8 @@ interface CreateCampaignModalProps {
     duration: number;
     fundingCap: string;
     milestones?: Array<{ description: string; amount: string }>;
+    enableNFT: boolean;
+    enableGovernance: boolean;
   }) => void;
 }
 
@@ -27,6 +31,7 @@ type DurationUnit = 'minutes' | 'hours' | 'days';
 export default function CreateCampaignModal({ 
   isOpen, 
   onClose, 
+  
 
 }: CreateCampaignModalProps) {
   const {factoryAbi, factoryAddress} = useCrowdfundFactory();
@@ -36,7 +41,8 @@ export default function CreateCampaignModal({
   const [duration, setDuration] = useState<string>('');
   const [durationUnit, setDurationUnit] = useState<DurationUnit>('days');
   const [fundingCap, setFundingCap] = useState<string>('');
-  
+  const router = useRouter();
+
   // Milestones
   const [useMilestones, setUseMilestones] = useState<boolean>(false);
   const [milestones, setMilestones] = useState<Milestone[]>([
@@ -97,7 +103,7 @@ export default function CreateCampaignModal({
     setIsCreating(true);
     try {
       if (!publicClient || !walletClient || !address) {
-        alert('Please connect your wallet');
+        toast.error('Please connect your wallet');
         return;
       }
 
@@ -146,11 +152,18 @@ export default function CreateCampaignModal({
 
       const hash = await walletClient.writeContract(request);
       
-      await publicClient.waitForTransactionReceipt({ hash });
-      
-      alert('✅ Campaign created successfully!');
+      await toast.promise(
+        publicClient.waitForTransactionReceipt({ hash }),
+        {
+          loading: 'Creating campaign...',
+          success: 'Campaign created successfully!',
+          error: 'Failed to create campaign',
+        }
+      );
+    
       onClose();
-      window.location.reload();
+      router.push('/explore');
+      
     } catch (error) {
       console.error('Error creating campaign:', error);
       
@@ -175,9 +188,8 @@ export default function CreateCampaignModal({
           errorMessage = 'Invalid milestone data. Please check your milestone inputs.';
         }
       }
-      
-      alert('Failed to create campaign: ' + errorMessage);
-    } finally {
+      toast.error('Failed to create campaign: ' + errorMessage);
+      } finally {
       setIsCreating(false);
     }
   };
@@ -396,7 +408,7 @@ export default function CreateCampaignModal({
                       className="mt-1 w-5 h-5"
                     />
                     <div>
-                      <div className="text-white font-semibold">🎨 NFT Rewards</div>
+                      <div className="text-white font-semibold">NFT Rewards</div>
                       <p className="text-sm text-gray-400 mt-1">
                         Automatically mint proof-of-contribution NFTs to all contributors when campaign succeeds.
                         Contributors receive unique, on-chain NFTs showing their support.

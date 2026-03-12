@@ -5,6 +5,8 @@
   import type { Address } from 'viem';
   import Link from 'next/link';
   import { useWalletClient, usePublicClient } from 'wagmi';
+  import { toast } from 'sonner';
+  import { useRouter } from 'next/navigation';
 
   interface Campaign {
     address: Address;
@@ -58,6 +60,8 @@
     // Calculate time remaining in milliseconds
     const timeRemainingMs = Math.max(0, timeRemaining);
 
+    const router = useRouter();
+
     // Determine which unit to display BEFORE rounding
     let timeLeftDisplay: string;
 
@@ -102,12 +106,12 @@
 
     const handleContribute = async () => {
       if (!contributionAmount || parseFloat(contributionAmount) <= 0) {
-        alert('Please enter a valid contribution amount');
+        toast.error('Please enter a valid contribution amount');
         return;
       }
 
       if (!walletClient || !publicClient) {
-        alert('Please connect your wallet');
+       toast.error('Please connect your wallet');
         return;
       }
 
@@ -126,21 +130,27 @@
         console.log('📝 Transaction hash:', hash);
         console.log('⏳ Waiting for confirmation...');
 
-        await publicClient.waitForTransactionReceipt({ hash });
+        await toast.promise(
+          publicClient.waitForTransactionReceipt({ hash }),
+          {
+            loading: 'Processing contribution...',
+            success: '✅ Contribution successful!',
+            error: 'Failed to contribute',
+          }
+        );
 
-        console.log('✅ Contribution successful!');
-        alert('Contribution successful!');
         setContributionAmount('');
         
         // Reload page to refresh campaign data
-        window.location.reload();
+        // window.location.reload();    
+        router.push(`/campaign/${campaignAddress}`);
+
       } catch (error: any) {
         console.error('❌ Contribution error:', error);
-        alert(error.message || 'Failed to contribute');
       } finally {
         setIsContributing(false);
       }
-    };
+      };
 
     // Status badge configuration
     const statusConfig = {
@@ -209,7 +219,7 @@
           <div className="flex justify-between items-end">
             <div className="flex flex-col gap-1">
               <span className="text-2xl font-bold text-white font-mono">
-                {raised.toFixed(2)} ETH
+                {raised.toFixed(5)} ETH
               </span>
               <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">
                 raised

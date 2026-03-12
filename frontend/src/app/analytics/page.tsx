@@ -141,7 +141,7 @@ export default function AnalyticsPage() {
             <div className="relative">
               <div className="text-sm font-medium tracking-[0.15em] uppercase text-violet-300/60 mb-3">Total Raised</div>
               <div className="text-7xl font-extralight tabular-nums tracking-tight text-white mb-2">
-                {parseFloat(formatEther(BigInt(platformStats.totalRaised))).toFixed(2)}
+                {parseFloat(formatEther(BigInt(platformStats.totalRaised))).toFixed(5)}
               </div>
               <div className="text-2xl text-violet-300 font-light">ETH</div>
               <div className="mt-4 text-sm text-white/40">
@@ -193,7 +193,7 @@ export default function AnalyticsPage() {
           <div className="bg-gradient-to-br from-pink-950/40 to-rose-950/40 border border-pink-500/20 rounded-3xl p-8 backdrop-blur-xl">
             <div className="text-xs font-medium tracking-[0.15em] uppercase text-pink-300/60 mb-3">Avg Contribution</div>
             <div className="text-4xl font-extralight tabular-nums tracking-tight text-white mb-1">
-              {parseFloat(formatEther(BigInt(platformStats.avgContribution))).toFixed(3)}
+              {parseFloat(formatEther(BigInt(platformStats.avgContribution))).toFixed(5)}
             </div>
             <div className="text-sm text-pink-300">ETH</div>
           </div>
@@ -210,7 +210,7 @@ export default function AnalyticsPage() {
                   {categoryStats.governance.count}
                 </div>
                 <div className="text-xs text-white/40">
-                  {parseFloat(formatEther(BigInt(categoryStats.governance.totalRaised))).toFixed(2)} ETH
+                  {parseFloat(formatEther(BigInt(categoryStats.governance.totalRaised))).toFixed(5)} ETH
                 </div>
               </div>
 
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
                   {categoryStats.nft.count}
                 </div>
                 <div className="text-xs text-white/40">
-                  {parseFloat(formatEther(BigInt(categoryStats.nft.totalRaised))).toFixed(2)} ETH
+                  {parseFloat(formatEther(BigInt(categoryStats.nft.totalRaised))).toFixed(5)} ETH
                 </div>
               </div>
             </>
@@ -285,7 +285,7 @@ export default function AnalyticsPage() {
                     {/* Amount Raised */}
                     <div className="text-right">
                       <div className="text-3xl font-light tabular-nums text-white mb-1">
-                        {parseFloat(formatEther(BigInt(campaign.totalFundsRaised))).toFixed(2)}
+                        {parseFloat(formatEther(BigInt(campaign.totalFundsRaised))).toFixed(5)}
                       </div>
                       <div className="text-sm text-violet-300">ETH</div>
                       <div className="text-xs text-white/30 mt-1">
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
 
                   <div className="text-right">
                     <div className="text-2xl font-light tabular-nums text-white">
-                      {parseFloat(formatEther(BigInt(contributor.totalContributed))).toFixed(2)}
+                      {parseFloat(formatEther(BigInt(contributor.totalContributed))).toFixed(5)}
                     </div>
                     <div className="text-xs text-cyan-300">ETH</div>
                   </div>

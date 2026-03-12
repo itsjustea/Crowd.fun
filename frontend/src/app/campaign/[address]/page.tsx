@@ -12,6 +12,9 @@ import MilestoneFundRelease from '@/components/MilestoneFundRelease';
 import { CROWDFUND_ABI } from '@/constants/abi';
 import { NFT_CONTRACT_ABI } from '@/constants/nft-abi';
 import NFTReward from '@/components/NFTReward';
+import { FACTORY_ABI } from '@/hooks/UseCrowdfundFactory';
+import NFTRewards from '@/components/NFTReward';
+import { toast } from 'sonner';
 
 // ---------------------------------------------------------------------------
 // WithdrawFunds — inline component for no-milestone successful campaigns
@@ -60,7 +63,7 @@ function WithdrawFunds({
 
   const handleWithdraw = async () => {
     if (!publicClient || !walletClient || !userAddress) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -74,10 +77,13 @@ function WithdrawFunds({
       });
 
       const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+        loading: 'Withdrawing funds...',
+        success: '✅ Funds withdrawn to beneficiary successfully!',
+        error: 'Failed to withdraw funds',
+      });
 
       setWithdrawn(true);
-      alert('✅ Funds withdrawn to beneficiary successfully!');
       await onSuccess(); // re-fetch parent campaign data
     } catch (error) {
       let msg = 'Unknown error';
@@ -86,7 +92,7 @@ function WithdrawFunds({
         if (msg.includes('user rejected')) msg = 'Transaction rejected by wallet.';
         if (msg.includes('Funds already withdrawn')) msg = 'Funds have already been withdrawn.';
       }
-      alert('Failed to withdraw funds: ' + msg);
+      toast.error('Failed to withdraw funds: ' + msg);
     } finally {
       setIsWithdrawing(false);
     }
@@ -180,7 +186,9 @@ interface CampaignData {
   milestoneCount: number;
   governanceEnabled: boolean;
   updateCount: number;
+  nftRewardsEnabled: boolean;
   userContribution: bigint;
+  nftContractAddress: Address|null; 
 }
 
 type TabType = 'overview' | 'updates' | 'governance' | 'milestone-funds' | 'funds' | 'nft-rewards';
@@ -198,7 +206,7 @@ export default function CampaignDetails() {
   const { data: walletClient } = useWalletClient();
   const { address: userAddress } = useAccount();
   const canClaimRefund = campaign?.finalized && !campaign.successful && campaign.userContribution < campaign.fundingCap && campaign.userContribution > BigInt(0);
-  console.log('campaign contribution:', campaign?.userContribution) ;
+  
 
   useEffect(() => {
     if (campaignAddress) {
@@ -226,7 +234,8 @@ export default function CampaignDetails() {
         Address,
         bigint,
         boolean,
-        bigint,
+        boolean,
+        bigint
       ];
 
       let userContribution = BigInt(0);
@@ -237,6 +246,33 @@ export default function CampaignDetails() {
           functionName: 'contributions',
           args: [userAddress],
         })) as bigint;
+      }
+
+      // Option 2: Read from campaign contract directly
+      let nftContractAddress: Address | null = null;
+      if (details[10]) { // if nftRewardsEnabled
+        try {
+          const contractAddr = (await publicClient.readContract({
+            address: campaignAddress,
+            abi: [
+              {
+                type: 'function',
+                name: 'nftContract',
+                inputs: [],
+                outputs: [{ type: 'address' }],
+                stateMutability: 'view',
+              }
+            ],
+            functionName: 'nftContract',
+          })) as Address;
+          
+          if (contractAddr && contractAddr !== '0x0000000000000000000000000000000000000000') {
+            nftContractAddress = contractAddr;
+            console.log('✅ NFT contract address fetched from campaign:', nftContractAddress);
+          }
+        } catch (error) {
+          console.error('Could not fetch NFT contract:', error);
+        }
       }
 
       setCampaign({
@@ -250,8 +286,10 @@ export default function CampaignDetails() {
         creator: details[7],
         milestoneCount: Number(details[8]),
         governanceEnabled: details[9],
-        updateCount: Number(details[10]),
+        nftRewardsEnabled: Boolean(details[10]),
+        updateCount: Number(details[11]),
         userContribution,
+        nftContractAddress
       });
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -264,7 +302,7 @@ export default function CampaignDetails() {
 
   const handleFinalize = async (): Promise<void> => {
     if (!publicClient || !walletClient || !userAddress) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -280,7 +318,11 @@ export default function CampaignDetails() {
       const hash = await walletClient.writeContract(request);
       await publicClient.waitForTransactionReceipt({ hash });
 
-      alert('✅ Campaign finalized successfully!');
+      await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+        loading: 'Finalizing campaign...',
+        success: '✅ Campaign finalized successfully!',
+        error: 'Failed to finalize campaign',
+      });
       await fetchCampaignData();
     } catch (error) {
       console.error('Error finalizing campaign:', error);
@@ -295,7 +337,7 @@ export default function CampaignDetails() {
           errorMessage = 'Campaign already finalized';
       }
 
-      alert('Failed to finalize campaign: ' + errorMessage);
+      toast.error('Failed to finalize campaign: ' + errorMessage);
     } finally {
       setIsFinalizing(false);
     }
@@ -402,8 +444,7 @@ export default function CampaignDetails() {
         } else {
           errorMsg += simError.shortMessage || simError.message || 'Unknown error';
         }
-
-        alert(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
@@ -433,14 +474,12 @@ export default function CampaignDetails() {
         errorMsg += error.shortMessage || error.message || 'Unknown error';
       }
 
-      alert(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
       console.log('═══════════════════════════════════════');
     }
   };
-
-
 
   // -----------------------------------------------------------------------
   // Render
@@ -652,7 +691,7 @@ export default function CampaignDetails() {
             </button>
           )}
 
-          {campaign.successful && (
+          {campaign.successful && campaign.nftRewardsEnabled === true && (
             <button
               onClick={() => setActiveTab('nft-rewards')}
               className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
@@ -661,7 +700,7 @@ export default function CampaignDetails() {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              🎨 NFT Rewards
+              NFT Rewards
             </button>
           )}
         </div>
@@ -794,19 +833,27 @@ export default function CampaignDetails() {
           )}
 
           {/* ---- NFT Rewards ---- */}
-          {activeTab === 'nft-rewards' && (
-            <NFTReward
-              campaignAddress={campaignAddress}
-              campaignAbi={CROWDFUND_ABI as Abi}
-              nftContractAddress={
-                process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS as Address
-              }
-              nftContractAbi={NFT_CONTRACT_ABI as Abi}
-              campaignName={campaign.name}
-              isSuccessful={campaign.successful}
-              isFinalized={campaign.finalized}
-              nftRewardsEnabled={true}
-            />
+         {activeTab === 'nft-rewards' && (
+            <>
+              {!campaign || !campaign.nftContractAddress ? (
+                <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
+                  <h2 className="text-2xl font-bold text-white mb-4">NFT Rewards</h2>
+                  <div className="text-center text-gray-400 py-8">Loading NFT information...</div>
+                </div>
+              ) : (
+                <NFTReward
+                  campaignAddress={campaignAddress}
+                  campaignAbi={CROWDFUND_ABI as Abi}
+                  nftContractAddress={campaign.nftContractAddress}
+                  nftContractAbi={NFT_CONTRACT_ABI as Abi}
+                  campaignName={campaign.name}
+                  isSuccessful={campaign.successful}
+                  isFinalized={campaign.finalized}
+                  nftRewardsEnabled={campaign.nftRewardsEnabled}
+                  isCreator={isCreator}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

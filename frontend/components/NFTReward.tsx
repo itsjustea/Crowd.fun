@@ -1,10 +1,12 @@
-// components/NFTRewards.tsx
+// components/NFTReward.tsx - UPDATED with claimNFT support
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePublicClient, useAccount } from 'wagmi';
+import { usePublicClient, useAccount, useWalletClient } from 'wagmi';
 import { formatEther, Address, Abi } from 'viem';
-
+import { CROWDFUND_ABI } from '@/constants/abi';
+import { NFT_CONTRACT_ABI } from '@/constants/nft-abi';
+import { toast } from 'sonner';
 
 interface NFTReward {
   eligible: boolean;
@@ -24,12 +26,13 @@ interface NFTMetadata {
 interface NFTRewardsProps {
   campaignAddress: Address;
   campaignAbi: Abi;
-  nftContractAddress: Address | null;  // Can be null if NFTs not enabled
+  nftContractAddress: Address | null;
   nftContractAbi: Abi;
   campaignName: string;
   isSuccessful: boolean;
   isFinalized: boolean;
   nftRewardsEnabled: boolean;
+  isCreator: boolean; 
 }
 
 export default function NFTRewards({
@@ -40,21 +43,23 @@ export default function NFTRewards({
   campaignName,
   isSuccessful,
   isFinalized,
-  nftRewardsEnabled
+  nftRewardsEnabled,
+  isCreator,
 }: NFTRewardsProps) {
   const [nftReward, setNFTReward] = useState<NFTReward | null>(null);
   const [nftMetadata, setNFTMetadata] = useState<NFTMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [imageLoading, setImageLoading] = useState<boolean>(true);
+  const [isClaiming, setIsClaiming] = useState<boolean>(false);
 
   const publicClient = usePublicClient();
   const { address: userAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
   useEffect(() => {
     fetchNFTReward();
   }, [campaignAddress, userAddress, publicClient]);
 
-  // Reset image loading state whenever new metadata arrives (e.g. after a refresh)
   useEffect(() => {
     if (nftMetadata) {
       setImageLoading(true);
@@ -67,7 +72,6 @@ export default function NFTRewards({
       return;
     }
 
-    // If no NFT contract address, NFTs aren't enabled
     if (!nftContractAddress || nftContractAddress === '0x0000000000000000000000000000000000000000') {
       setLoading(false);
       return;
@@ -75,7 +79,6 @@ export default function NFTRewards({
 
     setLoading(true);
     try {
-      // Get NFT reward info from campaign
       const rewardInfo = await publicClient.readContract({
         address: campaignAddress,
         abi: campaignAbi,
@@ -91,7 +94,6 @@ export default function NFTRewards({
 
       setNFTReward(reward);
 
-      // If minted, fetch metadata
       if (reward.minted && reward.tokenId > BigInt(0)) {
         await fetchNFTMetadata(reward.tokenId);
       }
@@ -106,7 +108,6 @@ export default function NFTRewards({
     if (!publicClient || !nftContractAddress) return;
 
     try {
-      // Get contribution data
       const contributionData = await publicClient.readContract({
         address: nftContractAddress,
         abi: nftContractAbi,
@@ -114,7 +115,6 @@ export default function NFTRewards({
         args: [tokenId],
       }) as readonly [Address, Address, bigint, string, bigint, bigint];
 
-      // Get token URI
       const tokenURI = await publicClient.readContract({
         address: nftContractAddress,
         abi: nftContractAbi,
@@ -122,7 +122,6 @@ export default function NFTRewards({
         args: [tokenId],
       }) as string;
 
-      // Parse metadata from data URI
       let imageData = '';
       if (tokenURI.startsWith('data:application/json;base64,')) {
         const base64Data = tokenURI.replace('data:application/json;base64,', '');
@@ -144,6 +143,72 @@ export default function NFTRewards({
     }
   };
 
+  // ✅ NEW: Claim NFT function
+  
+    const handleClaimNFT = async (): Promise<void> => {
+    if (!walletClient || !publicClient || !userAddress) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    setIsClaiming(true);
+    try {
+      console.log('🎨 Claiming NFT...');
+      console.log('Campaign:', campaignAddress);
+      console.log('User:', userAddress);
+
+      // ✅ Simulate first to catch the exact error
+      try {
+        const { request } = await publicClient.simulateContract({
+          address: campaignAddress,
+          abi: CROWDFUND_ABI,
+          functionName: 'claimNFT',
+          account: userAddress,
+        });
+
+        console.log('✅ Simulation passed, sending transaction...');
+
+        const hash = await walletClient.writeContract(request);
+        console.log('📝 Transaction hash:', hash);
+
+        await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+          loading: 'Claiming NFT...',
+          success: '🎉 NFT claimed successfully!',
+          error: 'Failed to claim NFT',
+        });
+        console.log('✅ NFT claimed successfully!');
+
+        await fetchNFTReward();
+      } catch (simError: any) {
+        console.error('❌ Simulation failed:', simError);
+        
+        // Extract the revert reason
+        let errorMsg = 'Failed to claim NFT:\n\n';
+        
+        if (simError.message?.includes('Campaign not authorized')) {
+          errorMsg += 'Campaign not authorized in NFT contract.\n\n';
+          errorMsg += 'The campaign needs to be authorized. Contact support.';
+        } else if (simError.message?.includes('already has NFT')) {
+          errorMsg += 'You have already claimed your NFT for this campaign!';
+        } else if (simError.message?.includes('Not a contributor')) {
+          errorMsg += 'You must contribute to this campaign first.';
+        } else if (simError.message?.includes('Campaign not finalized')) {
+          errorMsg += 'Campaign must be finalized first.';
+        } else if (simError.message?.includes('Campaign not successful')) {
+          errorMsg += 'Campaign was not successful. NFTs are only for successful campaigns.';
+        } else {
+          errorMsg += simError.shortMessage || simError.message || 'Unknown error';
+        }
+        
+        toast.error(errorMsg);
+        throw simError;
+      }
+    } catch (error: any) {
+      console.error('❌ Full error object:', error);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
   const formatDate = (timestamp: number): string => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -156,17 +221,24 @@ export default function NFTRewards({
   if (!userAddress) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">🎨 NFT Rewards</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">NFT Rewards</h2>
         <p className="text-gray-400">Connect your wallet to view your NFT rewards.</p>
       </div>
     );
   }
-
-  // NFTs not enabled for this campaign
+  console.log('🔍 Checking NFT enabled condition:', {
+    nftRewardsEnabled,
+    nftRewardsEnabledType: typeof nftRewardsEnabled,
+    nftContractAddress,
+    nftContractAddressType: typeof nftContractAddress,
+    isZeroAddress: nftContractAddress === '0x0000000000000000000000000000000000000000',
+    willReturn: !nftRewardsEnabled || !nftContractAddress || nftContractAddress === '0x0000000000000000000000000000000000000000'
+  });
+  // NFTs not enabled
   if (!nftRewardsEnabled || !nftContractAddress || nftContractAddress === '0x0000000000000000000000000000000000000000') {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">🎨 NFT Rewards</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">NFT Rewards</h2>
         <p className="text-gray-400">NFT rewards are not enabled for this campaign.</p>
       </div>
     );
@@ -176,7 +248,7 @@ export default function NFTRewards({
   if (loading) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">🎨 NFT Rewards</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">NFT Rewards</h2>
         <div className="text-center text-gray-400 py-8">Loading NFT reward info...</div>
       </div>
     );
@@ -186,7 +258,7 @@ export default function NFTRewards({
   if (!nftReward) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">🎨 NFT Rewards</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">NFT Rewards</h2>
         <p className="text-gray-400">Unable to load NFT reward information.</p>
       </div>
     );
@@ -195,44 +267,60 @@ export default function NFTRewards({
   return (
     <div className="mt-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-2">🎨 NFT Rewards</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">NFT Rewards</h2>
         <p className="text-gray-400 text-sm">
           Proof of Contribution NFTs are awarded to contributors of successful campaigns.
         </p>
       </div>
 
-      {/* Not Eligible */}
       {!nftReward.eligible && (
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <div className="text-center py-8">
             <div className="text-6xl mb-4">🎨</div>
-            <h3 className="text-xl font-semibold text-white mb-2">No NFT Reward Yet</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">No NFT Reward</h3>
             <p className="text-gray-400 mb-4">
               {!isFinalized
                 ? 'Campaign must be finalized first.'
                 : !isSuccessful
                 ? 'Campaign was not successful - NFTs are only awarded for successful campaigns.'
+                : isCreator
+                ? 'As the campaign creator, NFTs are awarded to contributors only.'
                 : 'You need to contribute to this campaign to earn an NFT reward.'}
             </p>
           </div>
         </div>
       )}
 
-      {/* Eligible but Not Minted */}
+      {/* ✅ UPDATED: Eligible but Not Minted - Show Claim Button */}
       {nftReward.eligible && !nftReward.minted && (
-        <div className="bg-yellow-900/20 border border-yellow-700 rounded-xl p-6">
+        <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-xl p-8 backdrop-blur-sm">
           <div className="text-center py-8">
-            <div className="text-6xl mb-4">⏳</div>
-            <h3 className="text-xl font-semibold text-yellow-300 mb-2">NFT Pending</h3>
-            <p className="text-yellow-200 mb-4">
-              Your Proof of Contribution NFT is being minted. This happens automatically when the campaign is finalized.
+            <div className="text-8xl mb-6">🎁</div>
+            <h3 className="text-3xl font-semibold text-green-300 mb-3">NFT Ready to Claim!</h3>
+            <p className="text-green-200 text-lg mb-6 max-w-md mx-auto">
+              Your Proof of Contribution NFT is ready. Click below to mint it to your wallet permanently on-chain.
             </p>
             <button
-              onClick={fetchNFTReward}
-              className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+              onClick={handleClaimNFT}
+              disabled={isClaiming}
+              className="px-10 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-bold text-lg rounded-xl transition-all shadow-lg hover:shadow-green-500/50 transform hover:-translate-y-0.5 disabled:cursor-not-allowed"
             >
-              🔄 Refresh Status
+              {isClaiming ? (
+                <>
+                  <span className="inline-block animate-spin mr-2">⏳</span>
+                  Claiming NFT...
+                </>
+              ) : (
+                <>
+                   Claim My NFT
+                </>
+              )}
             </button>
+            {isClaiming && (
+              <p className="text-green-300 text-sm mt-4">
+                Please confirm the transaction in your wallet...
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -274,13 +362,11 @@ export default function NFTRewards({
               </div>
 
               <div className="space-y-4">
-                {/* Campaign Name */}
                 <div className="bg-gray-900/50 rounded-lg p-4">
                   <div className="text-sm text-gray-400 mb-1">Campaign</div>
                   <div className="text-lg font-semibold text-white">{nftMetadata.campaignName}</div>
                 </div>
 
-                {/* Contribution Amount */}
                 <div className="bg-gray-900/50 rounded-lg p-4">
                   <div className="text-sm text-gray-400 mb-1">Your Contribution</div>
                   <div className="text-2xl font-bold text-white">
@@ -288,7 +374,6 @@ export default function NFTRewards({
                   </div>
                 </div>
 
-                {/* Contributor Number */}
                 <div className="bg-gray-900/50 rounded-lg p-4">
                   <div className="text-sm text-gray-400 mb-1">Contributor Number</div>
                   <div className="text-lg font-semibold text-white">
@@ -296,7 +381,6 @@ export default function NFTRewards({
                   </div>
                 </div>
 
-                {/* Timestamp */}
                 <div className="bg-gray-900/50 rounded-lg p-4">
                   <div className="text-sm text-gray-400 mb-1">Contributed On</div>
                   <div className="text-lg font-semibold text-white">
@@ -305,7 +389,6 @@ export default function NFTRewards({
                 </div>
               </div>
 
-              {/* View on Explorer */}
               <div className="mt-6 pt-6 border-t border-gray-700">
                 <a
                   href={`https://sepolia.arbiscan.io/nft/${nftContractAddress}/${nftMetadata.tokenId}`}
@@ -321,7 +404,6 @@ export default function NFTRewards({
             </div>
           </div>
 
-          {/* Additional Info */}
           <div className="bg-blue-900/20 border-t border-blue-700 p-6">
             <div className="flex items-start gap-3">
               <div className="text-2xl">ℹ️</div>

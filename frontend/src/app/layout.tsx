@@ -4,6 +4,7 @@ import "./globals.css";
 // import '@/styles/globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers'
+import { Toaster } from 'sonner';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +31,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <Toaster 
+            position="bottom-right"
+            theme="dark"
+            richColors
+            closeButton
+          />
+        </Providers>
       </body>
     </html>
   );

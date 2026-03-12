@@ -300,7 +300,7 @@ export default function Dashboard() {
                         {getStatusBadge(campaign)}
                         {campaign.nftRewardsEnabled && (
                           <span className="px-2 py-1 bg-indigo-900/30 text-indigo-400 border border-indigo-700 rounded text-xs">
-                            🎨 NFT
+                            NFT
                           </span>
                         )}
                         {campaign.governanceEnabled && (

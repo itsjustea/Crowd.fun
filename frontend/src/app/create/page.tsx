@@ -7,6 +7,7 @@ import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
 import { useAccount } from 'wagmi';
 import { Address } from 'viem';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function CreatePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,7 +29,7 @@ export default function CreatePage() {
       router.push('/explore');
     } catch (error) {
       console.error('Error creating campaign:', error);
-      alert('Failed to create campaign. Check console for details.');
+      toast.error('Failed to create campaign. Check console for details.');
     }
   };
 

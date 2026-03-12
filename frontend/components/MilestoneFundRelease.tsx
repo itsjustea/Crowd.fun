@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { formatEther, Address, Abi } from 'viem';
+import { toast } from 'sonner';
 
 interface Milestone {
   description: string;
@@ -100,7 +101,7 @@ export default function MilestoneFundRelease({
 
   const handleReleaseFunds = async (milestoneId: number): Promise<void> => {
     if (!publicClient || !walletClient || !address) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -116,9 +117,11 @@ export default function MilestoneFundRelease({
 
       const hash = await walletClient.writeContract(request);
 
-      await publicClient.waitForTransactionReceipt({ hash });
-
-      alert(`✅ Funds released for Milestone ${milestoneId + 1}!`);
+      await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+        loading: 'Releasing funds...',
+        success: `✅ Funds released for Milestone ${milestoneId + 1}!`,
+        error: 'Failed to release funds',
+      });
 
       // Refresh milestones
       await fetchMilestones();
@@ -140,7 +143,7 @@ export default function MilestoneFundRelease({
         }
       }
 
-      alert('Failed to release funds: ' + errorMessage);
+      toast.error('Failed to release funds: ' + errorMessage);
     } finally {
       setReleasingFunds(prev => ({ ...prev, [milestoneId]: false }));
     }

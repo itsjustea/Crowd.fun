@@ -4,6 +4,8 @@ import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import type { Address, Abi } from 'viem';
 import { useCampaignDetails } from '@/hooks/UseCampaignDetails';
+import { toast } from 'sonner';
+import { useRouter } from 'next/router';
 
 interface ContributorGovernanceProps {
   campaignAddress: Address;
@@ -22,6 +24,7 @@ export default function ContributorGovernance({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { address } = useAccount();
+  const router = useRouter();
 
   // Use the enhanced hook
   const {
@@ -36,7 +39,7 @@ export default function ContributorGovernance({
 
   const startVoting = async (milestoneId: number): Promise<void> => {
     if (!publicClient || !walletClient || !address) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -51,13 +54,19 @@ export default function ContributorGovernance({
       });
 
       const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
+      await toast.promise(
+        publicClient.waitForTransactionReceipt({ hash }),
+        {
+          loading: 'Starting vote on milestone...',
+          success: '✅ Voting started for milestone!',
+          error: 'Failed to start voting',
+        }
+      );
       
-      alert('✅ Voting started for milestone!');
       await refetch();
     } catch (error) {
       console.error('Error starting vote:', error);
-      alert('Failed to start voting: ' + (error as Error).message);
+      toast.error('Failed to start voting: ' + (error as Error).message);
     } finally {
       setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
@@ -65,7 +74,7 @@ export default function ContributorGovernance({
 
   const castVote = async (milestoneId: number, support: boolean): Promise<void> => {
     if (!publicClient || !walletClient || !address) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -80,13 +89,16 @@ export default function ContributorGovernance({
       });
 
       const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
-      
-      alert(`✅ Vote cast ${support ? 'FOR' : 'AGAINST'} milestone!`);
+      await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+        loading: 'Casting vote...',
+        success: `✅ Vote cast ${support ? 'FOR' : 'AGAINST'} milestone!`,
+        error: 'Failed to cast vote',
+      });
+
       await refetch();
     } catch (error) {
       console.error('Error casting vote:', error);
-      alert('Failed to cast vote: ' + (error as Error).message);
+      toast.error('Failed to cast vote: ' + (error as Error).message);
     } finally {
       setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
@@ -94,7 +106,7 @@ export default function ContributorGovernance({
 
   const resolveVote = async (milestoneId: number): Promise<void> => {
     if (!publicClient || !walletClient || !address) {
-      alert('Please connect your wallet');
+      toast.error('Please connect your wallet');
       return;
     }
 
@@ -109,13 +121,17 @@ export default function ContributorGovernance({
       });
 
       const hash = await walletClient.writeContract(request);
-      await publicClient.waitForTransactionReceipt({ hash });
       
-      alert('✅ Vote resolved!');
+      await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+        loading: 'Resolving vote...',
+        success: '✅ Vote resolved!',
+        error: 'Failed to resolve vote',
+      });
+
       await refetch();
     } catch (error) {
       console.error('Error resolving vote:', error);
-      alert('Failed to resolve vote: ' + (error as Error).message);
+      toast.error('Failed to resolve vote: ' + (error as Error).message);
     } finally {
       setVotingInProgress(prev => ({ ...prev, [milestoneId]: false }));
     }
