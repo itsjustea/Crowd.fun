@@ -73,13 +73,13 @@ contract ProofOfContribution is ERC721, ERC721URIStorage, Ownable {
         string memory campaignName,
         uint256 contributorNumber
     ) external returns (uint256) {
-        require(authorizedCampaigns[msg.sender], "Campaign not authorized");
-        require(contributor != address(0), "Invalid contributor");
-        require(amount > 0, "Amount must be greater than 0");
+        require(authorizedCampaigns[msg.sender], "not authorized");
+        require(contributor != address(0), "Invalid");
+        require(amount > 0, "must be greater than 0");
         
         // Check if contributor already has NFT for this campaign
         uint256 existingToken = campaignContributorTokens[msg.sender][contributor];
-        require(existingToken == 0, "Contributor already has NFT for this campaign");
+        require(existingToken == 0, "Already has NFT");
         
         uint256 tokenId = _nextTokenId++;
         

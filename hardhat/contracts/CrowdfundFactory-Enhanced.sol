@@ -19,17 +19,11 @@ contract CrowdfundFactory {
         address indexed campaign,
         address indexed creator,
         address indexed nftContract,
-        string name,
         uint256 fundingCap,
         uint256 deadline,
         bool nftRewardsEnabled,
         bool governanceEnabled
     );
-    
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner");
-        _;
-    }
     
     constructor() {
         owner = msg.sender;
@@ -62,14 +56,21 @@ contract CrowdfundFactory {
             msg.sender,
             _milestones,
             nftAddress,
-            _enableGovernance
+            _enableGovernance,
+            _enableNFTRewards                     
         );
         
         campaignAddress = address(campaign);
         
         // Transfer NFT ownership to campaign
         if (_enableNFTRewards) {
-            ProofOfContribution(nftAddress).transferOwnership(campaignAddress);
+            ProofOfContribution nft = ProofOfContribution(nftAddress);
+            
+            // ✅ 1. First authorize the campaign (factory is still owner)
+            nft.authorizeCampaign(campaignAddress);
+            
+            // ✅ 2. Then transfer ownership to campaign
+            nft.transferOwnership(campaignAddress);
         }
         
         // Register campaign
@@ -85,7 +86,6 @@ contract CrowdfundFactory {
             campaignAddress,
             msg.sender,
             nftAddress,
-            _name,
             _fundingCap,
             block.timestamp + _duration,
             _enableNFTRewards,

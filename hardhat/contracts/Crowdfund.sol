@@ -133,9 +133,10 @@ contract Crowdfund is ReentrancyGuard, Ownable {
         address _creator,
         MilestoneInput[] memory _milestones,
         address _nftContract,
-        bool _enableGovernance
+        bool _enableGovernance,
+        bool _enableNFTRewards
     ) Ownable(msg.sender) {
-        require(_beneficiary != address(0), "Invalid beneficiary");
+        require(_beneficiary != address(0), "");
         require(_fundingCap > 0, "Funding cap must be > 0");
         require(_duration > 0, "Duration must be > 0");
         
@@ -145,7 +146,7 @@ contract Crowdfund is ReentrancyGuard, Ownable {
         fundingCap = _fundingCap;
         deadline = block.timestamp + _duration;
         nftContract = IERC721(_nftContract);
-        nftRewardsEnabled = _nftContract != address(0);
+        nftRewardsEnabled = _nftContract != address(0) && _enableNFTRewards; // Only enable if contract provided
         governanceEnabled = _enableGovernance;
         
         for (uint256 i = 0; i < _milestones.length; i++) {
@@ -156,6 +157,8 @@ contract Crowdfund is ReentrancyGuard, Ownable {
                 fundsReleased: false
             }));
         }
+
+        
     }
     
     // ========== CONTRIBUTION FUNCTIONS ==========
@@ -184,9 +187,9 @@ contract Crowdfund is ReentrancyGuard, Ownable {
         
         emit CampaignFinalized(successful, totalFundsRaised);
         
-        if (successful && nftRewardsEnabled) {
-            _distributeNFTs();
-        }
+        // if (successful && nftRewardsEnabled) {
+        //     _distributeNFTs();
+        // }
     }
     
     function claimRefund() external nonReentrant {
@@ -204,29 +207,63 @@ contract Crowdfund is ReentrancyGuard, Ownable {
     
     // ========== NFT DISTRIBUTION ==========
     
-    function _distributeNFTs() private {
-        if (!nftRewardsEnabled || address(nftContract) == address(0)) return;
+    // function _distributeNFTs() private {
+    //     if (!nftRewardsEnabled || address(nftContract) == address(0)) return;
         
-        IProofOfContribution nft = IProofOfContribution(address(nftContract));
+    //     IProofOfContribution nft = IProofOfContribution(address(nftContract));
         
-        for (uint256 i = 0; i < contributors.length; i++) {
-            address contributor = contributors[i];
-            if (nftMinted[contributor]) continue;
+    //     for (uint256 i = 0; i < contributors.length; i++) {
+    //         address contributor = contributors[i];
+    //         if (nftMinted[contributor]) continue;
             
-            try nft.mintContribution(
-                contributor,
-                contributions[contributor],
-                name,
-                i + 1
-            ) returns (uint256 tokenId) {
-                nftMinted[contributor] = true;
-                emit NFTRewarded(contributor, tokenId);
-            } catch Error(string memory reason) {
-                emit NFTMintingFailed(contributor, reason);
-            } catch {
-                emit NFTMintingFailed(contributor, "Unknown error");
+    //         try nft.mintContribution(
+    //             contributor,
+    //             contributions[contributor],
+    //             name,
+    //             i + 1
+    //         ) returns (uint256 tokenId) {
+    //             nftMinted[contributor] = true;
+    //             emit NFTRewarded(contributor, tokenId);
+    //         } catch Error(string memory reason) {
+    //             emit NFTMintingFailed(contributor, reason);
+    //         } catch {
+    //             emit NFTMintingFailed(contributor, "Unknown error");
+    //         }
+    //     }
+    // }
+
+    function claimNFT() external nonReentrant {
+        require(finalized, "Campaign not finalized");
+        require(successful, "Campaign not successful");
+        require(nftRewardsEnabled, "NFT rewards disabled");
+        require(contributions[msg.sender] > 0, "Not a contributor");
+        require(!nftMinted[msg.sender], "NFT already claimed");
+        require(address(nftContract) != address(0), "NFT contract not set");
+
+        IProofOfContribution nft = IProofOfContribution(address(nftContract));
+
+        uint256 contributorNumber = 0;
+
+        // Find contributor index
+        for (uint256 i = 0; i < contributors.length; i++) {
+            if (contributors[i] == msg.sender) {
+                contributorNumber = i + 1;
+                break;
             }
         }
+
+        require(contributorNumber > 0, "Contributor not found");
+
+        uint256 tokenId = nft.mintContribution(
+            msg.sender,
+            contributions[msg.sender],
+            name,
+            contributorNumber
+        );
+
+        nftMinted[msg.sender] = true;
+
+        emit NFTRewarded(msg.sender, tokenId);
     }
     
     function getNFTRewardInfo(address contributor) external view returns (
@@ -429,7 +466,8 @@ contract Crowdfund is ReentrancyGuard, Ownable {
         bool _successful,
         address _creator,
         uint256 _milestoneCount,
-        bool _governanceEnabled
+        bool _governanceEnabled,
+        bool _nftRewardsEnabled
     ) {
         return (
             name,
@@ -441,7 +479,8 @@ contract Crowdfund is ReentrancyGuard, Ownable {
             successful,
             creator,
             milestones.length,
-            governanceEnabled
+            governanceEnabled,
+            nftRewardsEnabled
         );
     }
 }
