@@ -2,7 +2,8 @@
 
 
 # to fix
-- nft viewing
+- once voted, disable button
+
 # to test
 
 # feat

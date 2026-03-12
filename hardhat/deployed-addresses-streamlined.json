@@ -1,10 +1,10 @@
 {
-  "factory": "0xd22564a7243A5828C0235Efd922d04C77C344Ee1",
-  "testCampaign": "0x42D2A90Db091A667e90ABA7287a0FA168325446e",
-  "testCampaignNFT": "0x2BDAD6Cd6915433febF719C16C7Fad7385296edC",
+  "factory": "0x3578c2e2B6A75a8802f93A8B5b84E81aE5F36471",
+  "testCampaign": "0x7d34D634ABca9ea3e31b0Eca5D18bbd28803AE5F",
+  "testCampaignNFT": "0x8AF149E89e87D04140B94138D2964F2e8289bA44",
   "network": "arbitrum_sepolia",
   "deployer": "0x7Ad47dcf28E179E48c74B0d9e5C3E755Fa13eA41",
-  "timestamp": "2026-03-11T10:04:55.775Z",
+  "timestamp": "2026-03-12T13:51:21.770Z",
   "governanceType": "ONE-PERSON-ONE-VOTE",
   "version": "streamlined-v1"
 }

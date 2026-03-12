@@ -77,6 +77,8 @@ contract Crowdfund is ReentrancyGuard, Ownable {
     // NFT minting tracking
     mapping(address => bool) public nftMinted;
     bool public fundsWithdrawn;
+
+    // ========== CAMPAIGN UPDATES ==========
     
     // ========== EVENTS ==========
     
@@ -207,30 +209,6 @@ contract Crowdfund is ReentrancyGuard, Ownable {
     
     // ========== NFT DISTRIBUTION ==========
     
-    // function _distributeNFTs() private {
-    //     if (!nftRewardsEnabled || address(nftContract) == address(0)) return;
-        
-    //     IProofOfContribution nft = IProofOfContribution(address(nftContract));
-        
-    //     for (uint256 i = 0; i < contributors.length; i++) {
-    //         address contributor = contributors[i];
-    //         if (nftMinted[contributor]) continue;
-            
-    //         try nft.mintContribution(
-    //             contributor,
-    //             contributions[contributor],
-    //             name,
-    //             i + 1
-    //         ) returns (uint256 tokenId) {
-    //             nftMinted[contributor] = true;
-    //             emit NFTRewarded(contributor, tokenId);
-    //         } catch Error(string memory reason) {
-    //             emit NFTMintingFailed(contributor, reason);
-    //         } catch {
-    //             emit NFTMintingFailed(contributor, "Unknown error");
-    //         }
-    //     }
-    // }
 
     function claimNFT() external nonReentrant {
         require(finalized, "Campaign not finalized");
@@ -453,7 +431,6 @@ contract Crowdfund is ReentrancyGuard, Ownable {
     ) external onlyCreator {
         emit UpdatePosted(_milestoneId, _title, _ipfsHash, block.timestamp);
     }
-    
     // ========== VIEW FUNCTIONS ==========
     
     function getCampaignDetails() external view returns (
