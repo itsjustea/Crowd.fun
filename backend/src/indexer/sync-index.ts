@@ -83,7 +83,9 @@ export async function syncAllExistingCampaigns(
             finalized: details[5],
             successful: details[6],
             governanceEnabled: details[9],
-            nftRewardsEnabled: false, // Not in getCampaignDetails
+            nftRewardsEnabled: details[11],
+            nftContractAddress: details[11] ? await factory.getNFTContractForCampaign(address) : null,
+            // nftRewardsEnabled: false, // Not in getCampaignDetails
             blockNumber: BigInt(0),   // Unknown
             transactionHash: '',      // Unknown
           },

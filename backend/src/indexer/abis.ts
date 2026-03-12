@@ -19,9 +19,10 @@ export const CROWDFUND_ABI = [
   "event UpdatePosted(uint256 indexed milestoneId, string title, string ipfsHash, uint256 timestamp)",
   "event MilestoneCompleted(uint256 indexed milestoneId)",
   "event FundsWithdrawn(address indexed beneficiary, uint256 amount)",
-  
+
+
   // Campaign functions
-  "function getCampaignDetails() external view returns (string memory _name, address _beneficiary, uint256 _fundingCap, uint256 _deadline, uint256 _totalFundsRaised, bool _finalized, bool _successful, address _creator, uint256 _milestoneCount, bool _governanceEnabled)",
+  "function getCampaignDetails() external view returns (string memory _name, address _beneficiary, uint256 _fundingCap, uint256 _deadline, uint256 _totalFundsRaised, bool _finalized, bool _successful, address _creator, uint256 _milestoneCount, bool _governanceEnabled,uint256 _updateCount,bool _nftRewardsEnabled)",
   "function getAllMilestones() view returns (tuple(string description, uint256 amount, bool completed, bool fundsReleased, uint256 votesFor, uint256 votesAgainst)[])",
   "function contribute() payable",
   "function finalize()",

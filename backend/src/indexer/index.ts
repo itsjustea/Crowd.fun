@@ -1,24 +1,23 @@
-// src/indexer/index.ts - Listener with initial sync
+// src/indexer/index.ts - Polling-based approach (no event listeners for factory)
 
 import dotenv from 'dotenv';
 import { ethers } from 'ethers';
 import { PrismaClient } from '@prisma/client';
 import { FACTORY_ABI, CROWDFUND_ABI } from './abis';
-import { syncAllExistingCampaigns } from './sync-index';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
 
-class RealTimeListener {
+class PollingIndexer {
   private provider: ethers.JsonRpcProvider;
   private factoryContract: ethers.Contract;
   private campaignContracts: Map<string, ethers.Contract>;
   private factoryAddress: string;
+  private pollingInterval: NodeJS.Timeout | null = null;
 
   constructor(rpcUrl: string, factoryAddress: string) {
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.provider.pollingInterval = 15000;
     this.factoryAddress = factoryAddress;
     
     this.factoryContract = new ethers.Contract(
@@ -31,94 +30,154 @@ class RealTimeListener {
   }
 
   async start() {
-    console.log('🎧 Starting real-time listener');
+    console.log('🎧 Starting polling indexer');
     console.log('');
 
-    // STEP 1: Sync all existing campaigns from factory
-    await syncAllExistingCampaigns(this.provider, this.factoryAddress);
+    // Initial sync
+    await this.syncAllCampaigns();
 
-    // STEP 2: Start listening to existing campaigns
-    await this.loadExistingCampaigns();
+    // Start polling every 15 seconds
+    this.startPolling();
 
-    // STEP 3: Listen for new campaigns
-    this.listenToFactory();
-
-    // Error handling
-    this.provider.on('error', (error) => {
-      console.error('❌ Provider error:', error.message);
-    });
-
-    console.log('✅ Listener active!');
-    console.log('📡 Monitoring for new events...');
+    console.log('✅ Indexer active!');
+    console.log('📡 Polling every 15 seconds...');
     console.log('');
   }
 
-  private listenToFactory() {
-    console.log('👂 Listening for NEW campaigns...');
+  private startPolling() {
+    console.log('🔄 Starting campaign polling (every 15 seconds)');
     console.log('');
 
-    this.factoryContract.on(
-      'CampaignCreated',
-      async (campaign, creator, nftContract, name, fundingCap, deadline, nftRewardsEnabled, governanceEnabled, event) => {
-        try {
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('🆕 NEW CAMPAIGN DETECTED!');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(`   Name: ${name}`);
-          console.log(`   Address: ${campaign}`);
-          console.log(`   Creator: ${creator}`);
-          console.log(`   Block: ${event.log.blockNumber}`);
-          console.log('');
+    this.pollingInterval = setInterval(async () => {
+      try {
+        await this.syncAllCampaigns();
+      } catch (error) {
+        console.error('⚠️  Polling error:', error);
+      }
+    }, 15000); // Poll every 15 seconds
+  }
 
-          // Check if already exists
-          const existing = await prisma.campaign.findUnique({
-            where: { address: campaign.toLowerCase() },
-          });
+  private async syncAllCampaigns() {
+    try {
+      // Get all campaigns from factory
+      const campaignAddresses = await this.factoryContract.getAllCampaigns() as string[];
+      
+      console.log(`🔍 Checking ${campaignAddresses.length} campaign(s)...`);
 
-          if (existing) {
-            console.log('   ⏭️  Already in database');
-            console.log('');
-            return;
-          }
+      let newCount = 0;
+      let updatedCount = 0;
 
-          // Save to database
-          await prisma.campaign.create({
-            data: {
-              address: campaign.toLowerCase(),
-              name,
-              beneficiary: creator.toLowerCase(),
-              creator: creator.toLowerCase(),
-              fundingCap: fundingCap.toString(),
-              deadline: new Date(Number(deadline) * 1000),
-              governanceEnabled,
-              nftRewardsEnabled,
-              nftContractAddress: nftRewardsEnabled ? nftContract.toLowerCase() : null,
-              blockNumber: BigInt(event.log.blockNumber),
-              transactionHash: event.log.transactionHash,
-            },
-          });
+      for (const campaignAddress of campaignAddresses) {
+        const existing = await prisma.campaign.findUnique({
+          where: { address: campaignAddress.toLowerCase() },
+        });
 
-          console.log('   ✅ Saved to database');
-
-          // Fetch details
-          await this.fetchCampaignDetails(campaign);
-
-          // Start listening
-          this.listenToCampaign(campaign, name);
-
-          console.log('   ✅ Now monitoring this campaign');
-          console.log('');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('');
-        } catch (error) {
-          console.error('   ❌ Error:', error);
-          console.log('');
+        if (!existing) {
+          // New campaign!
+          await this.addNewCampaign(campaignAddress);
+          newCount++;
+        } else {
+          // Update existing campaign
+          await this.updateCampaign(campaignAddress);
+          updatedCount++;
         }
       }
-    );
+
+      if (newCount > 0) {
+        console.log(`✅ Found ${newCount} new campaign(s)`);
+      }
+      if (updatedCount > 0) {
+        console.log(`🔄 Updated ${updatedCount} campaign(s)`);
+      }
+      if (newCount === 0 && updatedCount === 0) {
+        console.log(`✓ No changes`);
+      }
+      console.log('');
+    } catch (error) {
+      console.error('❌ Sync error:', error);
+    }
   }
 
-  private async fetchCampaignDetails(campaignAddress: string) {
+  private async addNewCampaign(campaignAddress: string) {
+    try {
+      console.log('');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🆕 NEW CAMPAIGN DETECTED!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`   Address: ${campaignAddress}`);
+
+      const campaign = new ethers.Contract(
+        campaignAddress,
+        CROWDFUND_ABI,
+        this.provider
+      );
+
+      const details = await campaign.getCampaignDetails();
+
+      const name = details[0];
+      const beneficiary = details[1];
+      const fundingCap = details[2];
+      const deadline = details[3];
+      const totalFundsRaised = details[4];
+      const finalized = details[5];
+      const successful = details[6];
+      const creator = details[7];
+      const governanceEnabled = details[9];
+      const nftRewardsEnabled = details[10];
+
+      console.log(`   Name: ${name}`);
+      console.log(`   Creator: ${creator}`);
+      console.log(`   NFT Rewards: ${nftRewardsEnabled ? 'Yes ✅' : 'No ❌'}`);
+      console.log('');
+
+      // Get NFT contract address from factory
+      let nftContractAddress = null;
+      if (nftRewardsEnabled) {
+        try {
+          nftContractAddress = await this.factoryContract.getNFTContractForCampaign(campaignAddress);
+        } catch (error) {
+          console.warn('   ⚠️  Could not get NFT contract address');
+        }
+      }
+
+      // Save to database
+      await prisma.campaign.create({
+        data: {
+          address: campaignAddress.toLowerCase(),
+          name,
+          beneficiary: beneficiary.toLowerCase(),
+          creator: creator.toLowerCase(),
+          fundingCap: fundingCap.toString(),
+          deadline: new Date(Number(deadline) * 1000),
+          totalFundsRaised: totalFundsRaised.toString(),
+          finalized: Boolean(finalized),
+          successful: Boolean(successful),
+          governanceEnabled: Boolean(governanceEnabled),
+          nftRewardsEnabled: Boolean(nftRewardsEnabled),
+          nftContractAddress: nftContractAddress ? nftContractAddress.toLowerCase() : null,
+          blockNumber: BigInt(0), // Will be updated on first event
+          transactionHash: '',    // Will be updated on first event
+        },
+      });
+
+      console.log('   ✅ Saved to database');
+
+      // Sync milestones
+      await this.syncMilestones(campaignAddress);
+
+      // Start listening to campaign events
+      this.listenToCampaign(campaignAddress, name);
+
+      console.log('   ✅ Now monitoring this campaign');
+      console.log('');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('');
+    } catch (error) {
+      console.error('   ❌ Error adding campaign:', error);
+    }
+  }
+
+  private async updateCampaign(campaignAddress: string) {
     try {
       const campaign = new ethers.Contract(
         campaignAddress,
@@ -131,17 +190,36 @@ class RealTimeListener {
       await prisma.campaign.update({
         where: { address: campaignAddress.toLowerCase() },
         data: {
-          name: details[0],
-          beneficiary: details[1].toLowerCase(),
-          fundingCap: details[2].toString(),
-          deadline: new Date(Number(details[3]) * 1000),
           totalFundsRaised: details[4].toString(),
           finalized: details[5],
           successful: details[6],
-          creator: details[7].toLowerCase(),
-          governanceEnabled: details[9],
         },
       });
+
+      // Sync milestones
+      await this.syncMilestones(campaignAddress);
+
+      // Make sure we're listening to this campaign
+      const campaignRecord = await prisma.campaign.findUnique({
+        where: { address: campaignAddress.toLowerCase() },
+        select: { name: true },
+      });
+
+      if (campaignRecord && !this.campaignContracts.has(campaignAddress.toLowerCase())) {
+        this.listenToCampaign(campaignAddress, campaignRecord.name);
+      }
+    } catch (error) {
+      // Silently fail for updates
+    }
+  }
+
+  private async syncMilestones(campaignAddress: string) {
+    try {
+      const campaign = new ethers.Contract(
+        campaignAddress,
+        CROWDFUND_ABI,
+        this.provider
+      );
 
       const milestones = await campaign.getAllMilestones();
       const campaignRecord = await prisma.campaign.findUnique({
@@ -149,32 +227,37 @@ class RealTimeListener {
         select: { id: true },
       });
 
+      if (!campaignRecord) return;
+
       for (let i = 0; i < milestones.length; i++) {
         const m = milestones[i];
         await prisma.milestone.upsert({
           where: {
             campaignId_milestoneIndex: {
-              campaignId: campaignRecord!.id,
+              campaignId: campaignRecord.id,
               milestoneIndex: i,
             },
           },
-          update: {},
+          update: {
+            completed: m.completed,
+            fundsReleased: m.fundsReleased,
+            votesFor: safeToNumber(m.votesFor),
+            votesAgainst: safeToNumber(m.votesAgainst),
+          },
           create: {
-            campaignId: campaignRecord!.id,
+            campaignId: campaignRecord.id,
             milestoneIndex: i,
             description: m.description,
             amount: m.amount.toString(),
             completed: m.completed,
             fundsReleased: m.fundsReleased,
-            votesFor: Number(m.votesFor),
-            votesAgainst: Number(m.votesAgainst),
+            votesFor: safeToNumber(m.votesFor),
+            votesAgainst: safeToNumber(m.votesAgainst),
           },
         });
       }
-
-      console.log(`   📋 Fetched ${milestones.length} milestone(s)`);
     } catch (error) {
-      console.error('   ⚠️  Could not fetch details:', error);
+      // Silently fail
     }
   }
 
@@ -396,32 +479,18 @@ class RealTimeListener {
     });
   }
 
-  private async loadExistingCampaigns() {
-    try {
-      const campaigns = await prisma.campaign.findMany({
-        select: { address: true, name: true },
-      });
-
-      if (campaigns.length > 0) {
-        console.log(`👂 Setting up listeners for ${campaigns.length} campaign(s)...`);
-        for (const c of campaigns) {
-          this.listenToCampaign(c.address, c.name);
-        }
-        console.log(`✅ Monitoring ${campaigns.length} campaign(s)`);
-        console.log('');
-      }
-    } catch (error) {
-      console.warn('⚠️  Could not load campaigns:', error);
-    }
-  }
-
   async stop() {
     console.log('');
-    console.log('🛑 Stopping listener...');
-    this.factoryContract.removeAllListeners();
+    console.log('🛑 Stopping indexer...');
+    
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    
     for (const contract of this.campaignContracts.values()) {
       contract.removeAllListeners();
     }
+    
     await prisma.$disconnect();
     console.log('✅ Stopped');
   }
@@ -438,18 +507,18 @@ async function main() {
 
   console.log('');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚀 Crowdfund Indexer');
+  console.log('🚀 Crowdfund Indexer (Polling Mode)');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('');
   console.log(`📍 Factory: ${FACTORY_ADDRESS}`);
   console.log(`🌐 RPC: ${RPC_URL.substring(0, 50)}...`);
   console.log('');
 
-  const listener = new RealTimeListener(RPC_URL, FACTORY_ADDRESS);
-  await listener.start();
+  const indexer = new PollingIndexer(RPC_URL, FACTORY_ADDRESS);
+  await indexer.start();
 
   const shutdown = async () => {
-    await listener.stop();
+    await indexer.stop();
     process.exit(0);
   };
 
@@ -463,3 +532,14 @@ main().catch(async (error) => {
   await prisma.$disconnect();
   process.exit(1);
 });
+
+function safeToNumber(value: bigint): number {
+  const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+  
+  if (value > MAX_SAFE_INTEGER || value < BigInt(0)) {
+    console.warn(`   ⚠️  Vote count overflow: ${value.toString()}, using 0`);
+    return 0;
+  }
+  
+  return Number(value);
+}
