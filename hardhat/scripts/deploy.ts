@@ -19,40 +19,40 @@ interface DeployedAddresses {
 }
 
 async function main(): Promise<void> {
-  console.log("🚀 Deploying Streamlined Per-Campaign NFT Architecture...\n");
+  console.log("Deploying Streamlined Per-Campaign NFT Architecture...\n");
   console.log("=" .repeat(70));
-  console.log("ℹ️  Version: Streamlined (event-based updates, optimized for size)");
+  console.log("ℹVersion: Streamlined (event-based updates, optimized for size)");
   console.log("=" .repeat(70));
   console.log("");
 
   const [deployer] = await ethers.getSigners();
-  console.log("📍 Deploying with account:", deployer.address);
+  console.log("Deploying with account:", deployer.address);
   
   const balance = await deployer.provider.getBalance(deployer.address);
-  console.log("💰 Account balance:", ethers.formatEther(balance), "ETH");
+  console.log("Account balance:", ethers.formatEther(balance), "ETH");
   console.log("=" .repeat(70));
   console.log("");
 
   // ================================================================
   // STEP 1: Deploy CrowdfundFactory
   // ================================================================
-  console.log("🏭 Step 1/2: Deploying CrowdfundFactory (Streamlined)...");
-  console.log("   ⏳ This may take a moment...");
+  console.log("Step 1/2: Deploying CrowdfundFactory (Streamlined)...");
+  console.log("This may take a moment...");
   
   const CrowdfundFactory = await ethers.getContractFactory("CrowdfundFactory");
   const factory = await CrowdfundFactory.deploy();
   await factory.waitForDeployment();
   
   const factoryAddress = await factory.getAddress();
-  console.log("   ✅ CrowdfundFactory deployed to:", factoryAddress);
-  console.log("   📦 Each campaign will get its own ProofOfContribution NFT contract");
-  console.log("   📢 Campaign updates use events (no on-chain storage)");
+  console.log("CrowdfundFactory deployed to:", factoryAddress);
+  console.log("Each campaign will get its own ProofOfContribution NFT contract");
+  console.log("Campaign updates use events (no on-chain storage)");
   console.log("");
 
   // ================================================================
   // STEP 2: Create test campaign
   // ================================================================
-  console.log("🎯 Step 2/2: Creating test campaign...");
+  console.log("Step 2/2: Creating test campaign...");
   
   const campaignConfig = {
     name: "Demo: Streamlined Architecture",
@@ -83,10 +83,10 @@ async function main(): Promise<void> {
   console.log("   Goal:       ", ethers.formatEther(campaignConfig.fundingCap), "ETH");
   console.log("   Duration:   ", campaignConfig.duration / 86400, "days");
   console.log("   Milestones: ", milestones.length);
-  console.log("   NFT Rewards:", campaignConfig.enableNFT ? "✅ Enabled" : "❌ Disabled");
-  console.log("   Governance: ", campaignConfig.enableGovernance ? "✅ ONE-PERSON-ONE-VOTE" : "❌ Disabled");
+  console.log("   NFT Rewards:", campaignConfig.enableNFT ? "Enabled" : "Disabled");
+  console.log("   Governance: ", campaignConfig.enableGovernance ? "ONE-PERSON-ONE-VOTE" : "Disabled");
   console.log("");
-  console.log("   ⏳ Creating campaign...");
+  console.log("   Creating campaign...");
 
   const createTx = await factory.createCampaign(
     campaignConfig.name,
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     campaignConfig.enableGovernance
   );
   
-  console.log("   ⏳ Waiting for transaction confirmation...");
+  console.log("Waiting for transaction confirmation...");
   const receipt = await createTx.wait();
   
   // Extract campaign and NFT addresses from CampaignCreated event
@@ -124,8 +124,8 @@ async function main(): Promise<void> {
     }
   }
   
-  console.log("   ✅ Campaign deployed to:     ", campaignAddress);
-  console.log("   ✅ Campaign's NFT contract:  ", nftAddress);
+  console.log("Campaign deployed to:     ", campaignAddress);
+  console.log("Campaign's NFT contract:  ", nftAddress);
   console.log("");
 
   // ================================================================
@@ -141,16 +141,16 @@ async function main(): Promise<void> {
       
       console.log("   NFT contract owner: ", nftOwner);
       console.log("   Campaign address:   ", campaignAddress);
-      console.log("   Ownership match:    ", ownershipMatch ? "✅ YES" : "❌ NO");
+      console.log("   Ownership match:    ", ownershipMatch ? "YES" : "NO");
       
       if (!ownershipMatch) {
         console.log("");
-        console.log("⚠️  WARNING: NFT ownership mismatch!");
+        console.log("WARNING: NFT ownership mismatch!");
         console.log("   NFT minting may fail. Check factory logic.");
       }
       console.log("");
     } catch (e) {
-      console.log("   ⚠️  Could not verify ownership:", (e as Error).message);
+      console.log("Could not verify ownership:", (e as Error).message);
       console.log("");
     }
   }
@@ -158,11 +158,11 @@ async function main(): Promise<void> {
   // ================================================================
   // Test posting an update (event-based)
   // ================================================================
-  console.log("📢 Testing event-based updates...");
+  console.log("Testing event-based updates...");
   try {
     const campaign = await ethers.getContractAt("Crowdfund", campaignAddress);
     
-    console.log("   ⏳ Posting test update...");
+    console.log("Posting test update...");
     const updateTx = await campaign.postUpdate(
       "Welcome to the Campaign!",
       "QmTestHash123",  // Mock IPFS hash
@@ -170,12 +170,12 @@ async function main(): Promise<void> {
     );
     await updateTx.wait();
     
-    console.log("   ✅ Update posted successfully (check events)");
-    console.log("   💡 Updates are now event-based - no on-chain storage");
-    console.log("   📖 Frontend should read UpdatePosted events");
+    console.log("Update posted successfully (check events)");
+    console.log("Updates are now event-based - no on-chain storage");
+    console.log("Frontend should read UpdatePosted events");
     console.log("");
   } catch (e) {
-    console.log("   ⚠️  Could not post update:", (e as Error).message);
+    console.log("Could not post update:", (e as Error).message);
     console.log("   (This is non-critical for deployment)");
     console.log("");
   }
@@ -185,32 +185,32 @@ async function main(): Promise<void> {
   // ================================================================
   const separator = "=" .repeat(70);
   console.log(separator);
-  console.log("🎉 DEPLOYMENT COMPLETE!");
+  console.log("DEPLOYMENT COMPLETE!");
   console.log(separator);
   console.log("");
-  console.log("📊 Deployed Contracts:");
+  console.log("Deployed Contracts:");
   console.log("   CrowdfundFactory:        ", factoryAddress);
   console.log("   Test Campaign:           ", campaignAddress);
   console.log("   Campaign's NFT Contract: ", nftAddress);
   console.log("");
-  console.log("🏗️  Architecture:");
+  console.log("Architecture:");
   console.log("   • Each campaign has its own ProofOfContribution NFT contract");
   console.log("   • Campaign owns its NFT contract directly (no authorization)");
   console.log("   • Token IDs restart at 1 per campaign");
   console.log("   • Complete isolation between campaigns");
   console.log("");
-  console.log("📢 Campaign Updates:");
+  console.log("Campaign Updates:");
   console.log("   • Updates are EVENT-BASED (not stored on-chain)");
   console.log("   • Cheaper gas, better scalability");
   console.log("   • Frontend reads UpdatePosted events");
   console.log("   • Full content stored in IPFS");
   console.log("");
-  console.log("🗳️  Governance: ONE-PERSON-ONE-VOTE");
+  console.log("Governance: ONE-PERSON-ONE-VOTE");
   console.log("   • Each contributor gets exactly 1 vote");
   console.log("   • 60% approval required for milestones");
   console.log("   • 30% minimum participation");
   console.log("");
-  console.log("📝 Next Steps:");
+  console.log("Next Steps:");
   console.log("");
   console.log("   1. Update .env.local:");
   console.log(`      NEXT_PUBLIC_FACTORY_ADDRESS=${factoryAddress}`);
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
     outputPath,
     JSON.stringify(addresses, null, 2)
   );
-  console.log(`💾 Deployment info saved to ${outputPath}`);
+  console.log(`Deployment info saved to ${outputPath}`);
   console.log("");
 
   // Create environment file snippet
@@ -271,14 +271,14 @@ NEXT_PUBLIC_FACTORY_ADDRESS=${factoryAddress}
 `;
 
   fs.writeFileSync('.env.deployment', envSnippet);
-  console.log("💾 Environment variables saved to .env.deployment");
+  console.log("Environment variables saved to .env.deployment");
   console.log("   Copy these to your .env.local file");
   console.log("");
   
   // ================================================================
   // Contract size info
   // ================================================================
-  console.log("📦 Contract Size Info:");
+  console.log("Contract Size Info:");
   console.log("   This streamlined version removes on-chain update storage");
   console.log("   to stay under Ethereum's 24KB contract size limit.");
   console.log("");
@@ -288,10 +288,10 @@ NEXT_PUBLIC_FACTORY_ADDRESS=${factoryAddress}
   console.log("   - Frontend reads events and fetches full content from IPFS");
   console.log("");
   console.log("   Benefits:");
-  console.log("   ✅ Contract deploys successfully");
-  console.log("   ✅ Lower gas costs for updates");
-  console.log("   ✅ Better scalability (no storage bloat)");
-  console.log("   ✅ All other functionality preserved");
+  console.log("Contract deploys successfully");
+  console.log("Lower gas costs for updates");
+  console.log("Better scalability (no storage bloat)");
+  console.log("All other functionality preserved");
   console.log("");
   console.log(separator);
 }
@@ -299,7 +299,7 @@ NEXT_PUBLIC_FACTORY_ADDRESS=${factoryAddress}
 // Execute deployment
 main()
   .then(() => {
-    console.log("✅ Deployment script completed successfully");
+    console.log("Deployment script completed successfully");
     process.exit(0);
   })
   .catch((error: Error) => {

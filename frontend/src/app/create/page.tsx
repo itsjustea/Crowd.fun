@@ -101,9 +101,6 @@ export default function CreatePage() {
 
           {/* Feature 3 */}
           <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-8 hover:bg-white/[0.05] transition-all">
-            <div className="w-12 h-12 bg-pink-500/20 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">🎨</span>
-            </div>
             <h3 className="text-xl font-bold text-white mb-3">NFT Rewards</h3>
             <p className="text-white/60 leading-relaxed">
               Issue Proof of Contribution NFTs to all supporters automatically when campaign succeeds.

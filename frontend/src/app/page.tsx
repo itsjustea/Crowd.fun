@@ -91,9 +91,6 @@ export default function HomePage() {
 
             {/* Feature 3 */}
             <div className="group bg-white/[0.02] border border-white/10 rounded-3xl p-8 hover:bg-white/[0.05] hover:border-white/20 transition-all">
-              <div className="w-16 h-16 bg-gradient-to-br from-pink-500/20 to-indigo-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <span className="text-4xl">🎨</span>
-              </div>
               <h3 className="text-2xl font-bold text-white mb-4">NFT Rewards</h3>
               <p className="text-white/60 leading-relaxed">
                 Proof of Contribution NFTs for all supporters. On-chain recognition of your impact.

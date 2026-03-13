@@ -151,7 +151,7 @@ export default function NFTRewards({
 
     setIsClaiming(true);
     try {
-      console.log('🎨 Claiming NFT...');
+      console.log('Claiming NFT...');
       console.log('Campaign:', campaignAddress);
       console.log('User:', userAddress);
 
@@ -163,17 +163,17 @@ export default function NFTRewards({
           account: userAddress,
         });
 
-        console.log('✅ Simulation passed, sending transaction...');
+        console.log('Simulation passed, sending transaction...');
 
         const hash = await walletClient.writeContract(request);
-        console.log('📝 Transaction hash:', hash);
+        console.log('Transaction hash:', hash);
 
         await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
           loading: 'Claiming NFT...',
-          success: '🎉 NFT claimed successfully!',
+          success: 'NFT claimed successfully!',
           error: 'Failed to claim NFT',
         });
-        console.log('✅ NFT claimed successfully!');
+        console.log(' NFT claimed successfully!');
 
         await fetchNFTReward();
       } catch (simError: any) {
@@ -223,7 +223,7 @@ export default function NFTRewards({
       </div>
     );
   }
-  console.log('🔍 Checking NFT enabled condition:', {
+  console.log('Checking NFT enabled condition:', {
     nftRewardsEnabled,
     nftRewardsEnabledType: typeof nftRewardsEnabled,
     nftContractAddress,
@@ -273,7 +273,6 @@ export default function NFTRewards({
       {!nftReward.eligible && (
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <div className="text-center py-8">
-            <div className="text-6xl mb-4">🎨</div>
             <h3 className="text-xl font-semibold text-white mb-2">No NFT Reward</h3>
             <p className="text-gray-400 mb-4">
               {!isFinalized

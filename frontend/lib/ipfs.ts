@@ -61,28 +61,28 @@ export async function uploadImageToIPFS(file: File): Promise<string> {
 
 export async function fetchUpdateFromIPFS(ipfsHash: string): Promise<CampaignUpdate> {
   try {
-    console.log('🔍 Fetching update from IPFS:', ipfsHash);
+    console.log('Fetching update from IPFS:', ipfsHash);
     
     const url = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-    console.log('📡 Fetching from URL:', url);
+    console.log('Fetching from URL:', url);
     
     const response = await fetch(url);
     
-    console.log('📊 Response status:', response.status);
-    console.log('📊 Response ok:', response.ok);
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Response error:', errorText);
+      console.error('Response error:', errorText);
       throw new Error(`Failed to fetch: ${response.status}`);
     }
     
     const data = await response.json();
-    console.log('✅ Fetched data:', data);
+    console.log('Fetched data:', data);
     
     return data;
   } catch (error) {
-    console.error('❌ IPFS fetch error:', error);
+    console.error('IPFS fetch error:', error);
     throw new Error('Failed to fetch from IPFS');
   }
 }

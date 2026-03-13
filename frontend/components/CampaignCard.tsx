@@ -118,7 +118,7 @@
       try {
         setIsContributing(true);
 
-        console.log('💰 Contributing', contributionAmount, 'ETH to', campaignAddress);
+        console.log('Contributing', contributionAmount, 'ETH to', campaignAddress);
 
         const hash = await walletClient.writeContract({
           address: campaignAddress,
@@ -127,8 +127,8 @@
           value: parseEther(contributionAmount),
         });
 
-        console.log('📝 Transaction hash:', hash);
-        console.log('⏳ Waiting for confirmation...');
+        console.log('Transaction hash:', hash);
+        console.log('Waiting for confirmation...');
 
         await toast.promise(
           publicClient.waitForTransactionReceipt({ hash }),

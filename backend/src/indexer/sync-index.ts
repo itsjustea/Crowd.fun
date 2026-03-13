@@ -10,26 +10,22 @@ export async function syncAllExistingCampaigns(
   provider: ethers.Provider,
   factoryAddress: string
 ) {
-  console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📚 Syncing All Existing Campaigns');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('');
+  console.log('Syncing All Existing Campaigns');
 
   try {
     // Create factory contract
     const factory = new ethers.Contract(factoryAddress, FACTORY_ABI, provider);
 
     // Get all campaign addresses
-    console.log('🔍 Fetching all campaigns from factory...');
+    console.log('Fetching all campaigns from factory...');
     const campaignAddresses = await factory.getAllCampaigns();
     
-    console.log(`✅ Found ${campaignAddresses.length} campaign(s)`);
+    console.log(`Found ${campaignAddresses.length} campaign(s)`);
     console.log('');
 
     if (campaignAddresses.length === 0) {
-      console.log('💡 No campaigns exist yet - waiting for new ones');
-      console.log('');
+      console.log('No campaigns exist yet - waiting for new ones');
+      
       return;
     }
 
@@ -50,7 +46,7 @@ export async function syncAllExistingCampaigns(
         });
 
         if (existing) {
-          console.log(`   ⏭️  Already in database`);
+          console.log(`Already in database`);
           skipped++;
           continue;
         }
@@ -91,7 +87,7 @@ export async function syncAllExistingCampaigns(
           },
         });
 
-        console.log(`   ✅ Saved: ${details[0]}`);
+        console.log(`Saved: ${details[0]}`);
 
         // Fetch and save milestones
         const milestones = await campaign.getAllMilestones();
@@ -117,7 +113,7 @@ export async function syncAllExistingCampaigns(
         }
 
         if (milestones.length > 0) {
-          console.log(`   📋 Added ${milestones.length} milestone(s)`);
+          console.log(`Added ${milestones.length} milestone(s)`);
         }
 
         synced++;
@@ -134,16 +130,14 @@ export async function syncAllExistingCampaigns(
     }
 
     // Summary
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📊 Sync Summary');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(`✅ Synced: ${synced}`);
-    console.log(`⏭️  Skipped (already exists): ${skipped}`);
-    console.log(`❌ Errors: ${errors}`);
+    console.log('Sync Summary');
+    console.log(`Synced: ${synced}`);
+    console.log(`Skipped (already exists): ${skipped}`);
+    console.log(`Errors: ${errors}`);
     console.log('');
 
   } catch (error) {
-    console.error('❌ Sync failed:', error);
+    console.error('Sync failed:', error);
     throw error;
   }
 }

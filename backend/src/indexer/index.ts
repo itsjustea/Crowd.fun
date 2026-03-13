@@ -30,7 +30,7 @@ class PollingIndexer {
   }
 
   async start() {
-    console.log('🎧 Starting polling indexer');
+    console.log('Starting polling indexer');
     console.log('');
 
     // Initial sync
@@ -39,13 +39,13 @@ class PollingIndexer {
     // Start polling every 15 seconds
     this.startPolling();
 
-    console.log('✅ Indexer active!');
-    console.log('📡 Polling every 15 seconds...');
+    console.log('Indexer active!');
+    console.log('Polling every 15 seconds...');
     console.log('');
   }
 
   private startPolling() {
-    console.log('🔄 Starting campaign polling (every 15 seconds)');
+    console.log('Starting campaign polling (every 15 seconds)');
     console.log('');
 
     this.pollingInterval = setInterval(async () => {
@@ -62,7 +62,7 @@ class PollingIndexer {
       // Get all campaigns from factory
       const campaignAddresses = await this.factoryContract.getAllCampaigns() as string[];
       
-      console.log(`🔍 Checking ${campaignAddresses.length} campaign(s)...`);
+      console.log(`Checking ${campaignAddresses.length} campaign(s)...`);
 
       let newCount = 0;
       let updatedCount = 0;
@@ -84,26 +84,24 @@ class PollingIndexer {
       }
 
       if (newCount > 0) {
-        console.log(`✅ Found ${newCount} new campaign(s)`);
+        console.log(`Found ${newCount} new campaign(s)`);
       }
       if (updatedCount > 0) {
-        console.log(`🔄 Updated ${updatedCount} campaign(s)`);
+        console.log(`Updated ${updatedCount} campaign(s)`);
       }
       if (newCount === 0 && updatedCount === 0) {
-        console.log(`✓ No changes`);
+        console.log(`No changes`);
       }
       console.log('');
     } catch (error) {
-      console.error('❌ Sync error:', error);
+      console.error('Sync error:', error);
     }
   }
 
   private async addNewCampaign(campaignAddress: string) {
     try {
       console.log('');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🆕 NEW CAMPAIGN DETECTED!');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('NEW CAMPAIGN DETECTED!');
       console.log(`   Address: ${campaignAddress}`);
 
       const campaign = new ethers.Contract(
@@ -127,8 +125,7 @@ class PollingIndexer {
 
       console.log(`   Name: ${name}`);
       console.log(`   Creator: ${creator}`);
-      console.log(`   NFT Rewards: ${nftRewardsEnabled ? 'Yes ✅' : 'No ❌'}`);
-      console.log('');
+      console.log(`   NFT Rewards: ${nftRewardsEnabled ? 'Yes' : 'No'}`);
 
       // Get NFT contract address from factory
       let nftContractAddress = null;
@@ -160,7 +157,7 @@ class PollingIndexer {
         },
       });
 
-      console.log('   ✅ Saved to database');
+      console.log('Saved to database');
 
       // Sync milestones
       await this.syncMilestones(campaignAddress);
@@ -168,12 +165,10 @@ class PollingIndexer {
       // Start listening to campaign events
       this.listenToCampaign(campaignAddress, name);
 
-      console.log('   ✅ Now monitoring this campaign');
-      console.log('');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('');
+      console.log('Now monitoring this campaign');
+      
     } catch (error) {
-      console.error('   ❌ Error adding campaign:', error);
+      console.error('Error adding campaign:', error);
     }
   }
 
@@ -277,13 +272,10 @@ class PollingIndexer {
     // Contribution
     campaign.on('ContributionReceived', async (contributor, amount, event) => {
       try {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`💰 CONTRIBUTION to "${campaignName}"`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`   Amount: ${ethers.formatEther(amount)} ETH`);
-        console.log(`   From: ${contributor}`);
-        console.log('');
-
+        console.log(`CONTRIBUTION to "${campaignName}"`);
+        console.log(`Amount: ${ethers.formatEther(amount)} ETH`);
+        console.log(`From: ${contributor}`);
+  
         const campaignRecord = await prisma.campaign.findUnique({
           where: { address: campaignAddress.toLowerCase() },
           select: { id: true },
@@ -340,11 +332,6 @@ class PollingIndexer {
             contributorCount: contributions.length,
           },
         });
-
-        console.log('   ✅ Contribution recorded');
-        console.log('');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('');
       } catch (error) {
         console.error('   ❌ Error:', error);
       }
@@ -353,12 +340,9 @@ class PollingIndexer {
     // Finalization
     campaign.on('CampaignFinalized', async (successful, totalRaised, event) => {
       try {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`🏁 CAMPAIGN FINALIZED: "${campaignName}"`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`   Status: ${successful ? 'SUCCESS ✅' : 'FAILED ❌'}`);
-        console.log(`   Total: ${ethers.formatEther(totalRaised)} ETH`);
-        console.log('');
+        console.log(`CAMPAIGN FINALIZED: "${campaignName}"`);
+        console.log(`Status: ${successful ? 'SUCCESS' : 'FAILED'}`);
+        console.log(`Total: ${ethers.formatEther(totalRaised)} ETH`);
 
         await prisma.campaign.update({
           where: { address: campaignAddress.toLowerCase() },
@@ -369,10 +353,7 @@ class PollingIndexer {
           },
         });
 
-        console.log('   ✅ Status updated');
-        console.log('');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('');
+        console.log('Status updated');
       } catch (error) {
         console.error('   ❌ Error:', error);
       }
@@ -381,13 +362,10 @@ class PollingIndexer {
     // Votes
     campaign.on('VoteCast', async (milestoneId, voter, support, event) => {
       try {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`🗳️  VOTE on "${campaignName}"`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`VOTE on "${campaignName}"`);
         console.log(`   Milestone: ${milestoneId}`);
-        console.log(`   Vote: ${support ? 'FOR ✅' : 'AGAINST ❌'}`);
-        console.log('');
-
+        console.log(`   Vote: ${support ? 'FOR' : 'AGAINST'}`);
+        
         const campaignRecord = await prisma.campaign.findUnique({
           where: { address: campaignAddress.toLowerCase() },
           select: { id: true },
@@ -432,10 +410,7 @@ class PollingIndexer {
           });
         }
 
-        console.log('   ✅ Vote recorded');
-        console.log('');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('');
+        console.log('Vote recorded');
       } catch (error) {
         console.error('   ❌ Error:', error);
       }
@@ -444,11 +419,8 @@ class PollingIndexer {
     // Updates
     campaign.on('UpdatePosted', async (milestoneId, title, ipfsHash, timestamp, event) => {
       try {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`📢 UPDATE on "${campaignName}"`);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log(`UPDATE on "${campaignName}"`);
         console.log(`   Title: ${title}`);
-        console.log('');
 
         const campaignRecord = await prisma.campaign.findUnique({
           where: { address: campaignAddress.toLowerCase() },
@@ -469,10 +441,7 @@ class PollingIndexer {
           },
         });
 
-        console.log('   ✅ Update recorded');
-        console.log('');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('');
+        console.log('Update recorded');
       } catch (error) {
         console.error('   ❌ Error:', error);
       }
@@ -480,9 +449,6 @@ class PollingIndexer {
   }
 
   async stop() {
-    console.log('');
-    console.log('🛑 Stopping indexer...');
-    
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }
@@ -492,7 +458,7 @@ class PollingIndexer {
     }
     
     await prisma.$disconnect();
-    console.log('✅ Stopped');
+   
   }
 }
 
@@ -505,15 +471,10 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('🚀 Crowdfund Indexer (Polling Mode)');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('');
-  console.log(`📍 Factory: ${FACTORY_ADDRESS}`);
-  console.log(`🌐 RPC: ${RPC_URL.substring(0, 50)}...`);
-  console.log('');
-
+  console.log('Crowdfund Indexer (Polling Mode)');
+  console.log(`Factory: ${FACTORY_ADDRESS}`);
+  console.log(`RPC: ${RPC_URL.substring(0, 50)}...`);
+  
   const indexer = new PollingIndexer(RPC_URL, FACTORY_ADDRESS);
   await indexer.start();
 

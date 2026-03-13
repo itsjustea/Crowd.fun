@@ -268,7 +268,7 @@ export default function CampaignDetails() {
           
           if (contractAddr && contractAddr !== '0x0000000000000000000000000000000000000000') {
             nftContractAddress = contractAddr;
-            console.log('✅ NFT contract address fetched from campaign:', nftContractAddress);
+            console.log('NFT contract address fetched from campaign:', nftContractAddress);
           }
         } catch (error) {
           console.error('Could not fetch NFT contract:', error);
@@ -413,7 +413,7 @@ export default function CampaignDetails() {
       setLoading(true);
 
       console.log('═══════════════════════════════════════');
-      console.log('💰 CLAIMING REFUND');
+      console.log('CLAIMING REFUND');
       console.log('═══════════════════════════════════════');
       console.log('Campaign:', campaignAddress);
       console.log('Your address:', userAddress);
@@ -426,13 +426,13 @@ export default function CampaignDetails() {
           functionName: 'claimRefund',
           account: userAddress,
         });
-        console.log('✅ Simulation successful');
+        console.log('Simulation successful');
 
         const hash = await walletClient.writeContract(request);
         await publicClient.waitForTransactionReceipt({ hash });
-        console.log('✅ Refund claimed successfully!');
+        console.log('Refund claimed successfully!');
       } catch (simError: any) {
-        console.error('❌ Simulation failed:', simError);
+        console.error('Simulation failed:', simError);
 
         let errorMsg = 'Cannot claim refund:\n\n';
         if (simError.message?.includes('Campaign not finalized yet')) {

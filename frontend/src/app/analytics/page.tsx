@@ -216,7 +216,6 @@ export default function AnalyticsPage() {
 
               <div className="bg-gradient-to-br from-indigo-950/30 to-violet-950/30 border border-indigo-500/20 rounded-3xl p-6 backdrop-blur-xl">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="text-2xl">🎨</div>
                   <div className="text-xs font-medium tracking-[0.15em] uppercase text-indigo-300/60">NFT Rewards</div>
                 </div>
                 <div className="text-3xl font-extralight tracking-tight text-white mb-1">
