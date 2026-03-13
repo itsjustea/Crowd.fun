@@ -38,7 +38,6 @@ export function useNFTContract(
           args: [campaignAddress],
         }) as Address;
 
-        // Check if the campaign has NFTs enabled (address won't be 0x0)
         if (address === '0x0000000000000000000000000000000000000000') {
           setNftAddress(null);
         } else {

@@ -65,11 +65,7 @@ contract CrowdfundFactory {
         // Transfer NFT ownership to campaign
         if (_enableNFTRewards) {
             ProofOfContribution nft = ProofOfContribution(nftAddress);
-            
-            // ✅ 1. First authorize the campaign (factory is still owner)
             nft.authorizeCampaign(campaignAddress);
-            
-            // ✅ 2. Then transfer ownership to campaign
             nft.transferOwnership(campaignAddress);
         }
         

@@ -79,12 +79,12 @@ function WithdrawFunds({
       const hash = await walletClient.writeContract(request);
       await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
         loading: 'Withdrawing funds...',
-        success: '✅ Funds withdrawn to beneficiary successfully!',
+        success: 'Funds withdrawn to beneficiary successfully!',
         error: 'Failed to withdraw funds',
       });
 
       setWithdrawn(true);
-      await onSuccess(); // re-fetch parent campaign data
+      await onSuccess();
     } catch (error) {
       let msg = 'Unknown error';
       if (error instanceof Error) {
@@ -320,7 +320,7 @@ export default function CampaignDetails() {
 
       await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
         loading: 'Finalizing campaign...',
-        success: '✅ Campaign finalized successfully!',
+        success: 'Campaign finalized successfully!',
         error: 'Failed to finalize campaign',
       });
       await fetchCampaignData();

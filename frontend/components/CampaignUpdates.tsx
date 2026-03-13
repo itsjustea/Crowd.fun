@@ -38,6 +38,8 @@ export default function CampaignUpdates({
   const [selectedImages, setSelectedImages] = useState<File[]>([]); // For image uploads
   const [uploadedImageHashes, setUploadedImageHashes] = useState<string[]>([]); // Store IPFS hashes of uploaded images
   const [updateContents, setUpdateContents] = useState<Record<number, CampaignUpdate>>({}); // Cache for fetched update content
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
 
   // Form state
   const [title, setTitle] = useState<string>('');
@@ -84,7 +86,6 @@ export default function CampaignUpdates({
       
       if (!publicClient) return;
 
-      // ✅ Fetch UpdatePosted events instead of reading storage
       const logs = await publicClient.getLogs({
         address: campaignAddress,
         event: {
@@ -137,6 +138,12 @@ export default function CampaignUpdates({
     } catch (error) {
       console.error('Error fetching milestones:', error);
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchUpdates();
+    setIsRefreshing(false);
   };
 
   const formatTimestamp = (timestamp: number): string => {
@@ -251,7 +258,7 @@ export default function CampaignUpdates({
         publicClient.waitForTransactionReceipt({ hash }),
         {
           loading: 'Posting update on-chain...',
-          success: '✅ Update posted successfully!',
+          success: 'Update posted successfully!',
           error: 'Failed to post update',
         }
       );
@@ -265,6 +272,11 @@ export default function CampaignUpdates({
       setSelectedMilestone('none');
       setShowPostForm(false);
       
+      setTimeout(async () => {
+        await fetchUpdates();
+      }, 2000); // Wait 2 seconds for the event to be indexed
+      
+
       await fetchUpdates();
     } catch (error) {
       console.error('Error posting update:', error);
@@ -278,14 +290,25 @@ export default function CampaignUpdates({
     <div className="mt-8">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-white">Campaign Updates</h2>
-        {isCreator && (
+        <div className="flex items-center gap-3 ml-auto">
           <button
-            onClick={() => setShowPostForm(!showPostForm)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            {showPostForm ? 'Cancel' : '+ Post Update'}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white/70 text-sm font-semibold transition-all disabled:opacity-50"
+            >
+            {isRefreshing ? '↻ Refreshing...' : '↻ Refresh'}
           </button>
-        )}
+        
+
+          {isCreator && (
+            <button
+              onClick={() => setShowPostForm(!showPostForm)}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white/70 text-sm font-semibold transition-all disabled:opacity-50"
+            >
+              {showPostForm ? 'Cancel' : '+ Post Update'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Post Update Form */}
@@ -408,7 +431,7 @@ export default function CampaignUpdates({
       ) : (
         <div className="space-y-4">
           {updates.map((update) => {
-            const content = updateContents[update.id]; // ✅ Get fetched content
+            const content = updateContents[update.id]; 
             
             return (
               <div
@@ -432,40 +455,46 @@ export default function CampaignUpdates({
                   </div>
                 )}
 
-                {/* ✅ Update Content */}
                 {content ? (
                   <div className="mb-4">
                     <p className="text-gray-300 text-sm whitespace-pre-wrap mb-4">
                       {content.content}
                     </p>
 
-                    {/* ✅ Display Images from IPFS */}
                     {content.images && content.images.length > 0 && (
                       <div className={`grid gap-3 mb-4 ${
                         content.images.length === 1 ? 'grid-cols-1' :
                         content.images.length === 2 ? 'grid-cols-2' :
                         'grid-cols-3'
                       }`}>
-                        {content.images.map((imageHash: string, idx: number) => (
-                          <a
-                            key={idx}
-                            href={`https://gateway.pinata.cloud/ipfs/${imageHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group relative block"
-                          >
+                        
+                       {content.images.map((imageHash: string, idx: number) => (
+                          <div key={idx} className="group relative">
                             <img
                               src={`https://gateway.pinata.cloud/ipfs/${imageHash}`}
                               alt={`Update image ${idx + 1}`}
                               className="w-full h-48 object-cover rounded-lg border border-gray-700 group-hover:border-gray-500 transition-colors"
+                              crossOrigin="anonymous"
+                              loading="lazy"
+                              onError={(e) => {
+                                console.error('❌ Image failed to load:', imageHash);
+                                const img = e.target as HTMLImageElement;
+                                img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="400" height="300" fill="%23374151"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239CA3AF" font-family="sans-serif"%3EImage failed to load%3C/text%3E%3C/svg%3E';
+                              }}
                             />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center">
-                              <span className="text-white opacity-0 group-hover:opacity-100 font-semibold text-sm">
+                            
+                            {/* Click overlay to view full size */}
+                            <a
+                              href={`https://gateway.pinata.cloud/ipfs/${imageHash}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 flex items-center justify-center bg-black/20 bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                              <span className="text-white/90 font-semibold text-sm bg-black/30 px-3 py-1.5 rounded-lg backdrop-blur-sm">
                                 View Full Size ↗
                               </span>
-                            </div>
-                          </a>
-                        ))}
+                            </a>
+                          </div>
+                        ))} 
                       </div>
                     )}
 

@@ -146,7 +146,6 @@ async function testFactoryEvents() {
   console.log('Waiting for events...');
   console.log('');
 
-  // Wait 60 seconds
   await new Promise(resolve => setTimeout(resolve, 60000));
 
   console.log('');

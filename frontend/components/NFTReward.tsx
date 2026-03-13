@@ -143,8 +143,6 @@ export default function NFTRewards({
     }
   };
 
-  // ✅ NEW: Claim NFT function
-  
     const handleClaimNFT = async (): Promise<void> => {
     if (!walletClient || !publicClient || !userAddress) {
       toast.error('Please connect your wallet');
@@ -157,7 +155,6 @@ export default function NFTRewards({
       console.log('Campaign:', campaignAddress);
       console.log('User:', userAddress);
 
-      // ✅ Simulate first to catch the exact error
       try {
         const { request } = await publicClient.simulateContract({
           address: campaignAddress,

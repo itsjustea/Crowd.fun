@@ -1,5 +1,4 @@
-// backend/src/api/analytics.ts - COMPLETELY FIXED
-
+// backend/src/api/analytics.ts
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 

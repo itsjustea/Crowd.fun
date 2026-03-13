@@ -58,7 +58,7 @@ export default function ContributorGovernance({
         publicClient.waitForTransactionReceipt({ hash }),
         {
           loading: 'Starting vote on milestone...',
-          success: '✅ Voting started for milestone!',
+          success: 'Voting started for milestone!',
           error: 'Failed to start voting',
         }
       );
@@ -124,7 +124,7 @@ export default function ContributorGovernance({
       
       await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
         loading: 'Resolving vote...',
-        success: '✅ Vote resolved!',
+        success: 'Vote resolved!',
         error: 'Failed to resolve vote',
       });
 

@@ -134,7 +134,7 @@
           publicClient.waitForTransactionReceipt({ hash }),
           {
             loading: 'Processing contribution...',
-            success: '✅ Contribution successful!',
+            success: 'Contribution successful!',
             error: 'Failed to contribute',
           }
         );

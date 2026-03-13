@@ -20,7 +20,6 @@ export async function uploadUpdateToIPFS(update: CampaignUpdate): Promise<string
       body: formData,
     });
     
-     // ✅ Better error handling
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Upload failed:', response.status, errorText);
@@ -46,7 +45,6 @@ export async function uploadImageToIPFS(file: File): Promise<string> {
       body: formData,
     });
     
-    // ✅ Better error handling
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Image upload failed:', response.status, errorText);
