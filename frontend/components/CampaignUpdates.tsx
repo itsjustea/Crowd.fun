@@ -4,6 +4,7 @@ import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { Address, Abi } from 'viem';
 import { uploadUpdateToIPFS, uploadImageToIPFS, fetchUpdateFromIPFS, CampaignUpdate } from '../lib/ipfs';
 import { toast } from 'sonner';
+import { getGasParameters } from '../lib/gas';
 
 interface Update {
   id: number;
@@ -240,6 +241,8 @@ export default function CampaignUpdates({
 
     setIsPosting(true);
     try {
+      const gasParams = await getGasParameters(publicClient);
+
       const milestoneId = selectedMilestone === 'none' 
         ? BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')
         : BigInt(selectedMilestone);
@@ -250,6 +253,7 @@ export default function CampaignUpdates({
         functionName: 'postUpdate',
         args: [title, ipfsHash, milestoneId],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);

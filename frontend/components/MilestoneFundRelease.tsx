@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { formatEther, Address, Abi } from 'viem';
 import { toast } from 'sonner';
+import { getGasParameters } from '@/lib/gas';
 
 interface Milestone {
   description: string;
@@ -104,7 +105,7 @@ export default function MilestoneFundRelease({
       toast.error('Please connect your wallet');
       return;
     }
-
+    const gasParams = await getGasParameters(publicClient);
     setReleasingFunds(prev => ({ ...prev, [milestoneId]: true }));
     try {
       const { request } = await publicClient.simulateContract({
@@ -113,6 +114,7 @@ export default function MilestoneFundRelease({
         functionName: 'releaseMilestoneFunds',
         args: [BigInt(milestoneId)],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);
@@ -197,7 +199,7 @@ export default function MilestoneFundRelease({
   if (!isFinalized || !isSuccessful) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">💰 Milestone Funds</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">Milestone Funds</h2>
         <p className="text-gray-400">
           Fund release will be available after the campaign is finalized and successful.
         </p>
@@ -208,7 +210,7 @@ export default function MilestoneFundRelease({
   if (loading) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">💰 Milestone Funds</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">Milestone Funds</h2>
         <p className="text-gray-400">Loading milestones...</p>
       </div>
     );
@@ -217,7 +219,7 @@ export default function MilestoneFundRelease({
   if (milestones.length === 0) {
     return (
       <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h2 className="text-2xl font-bold text-white mb-4">💰 Milestone Funds</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">Milestone Funds</h2>
         <p className="text-gray-400">No milestones defined for this campaign.</p>
       </div>
     );
@@ -226,7 +228,7 @@ export default function MilestoneFundRelease({
   return (
     <div className="mt-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-2">💰 Milestone Fund Release</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Milestone Fund Release</h2>
         <p className="text-gray-400 text-sm">
           Release funds to the beneficiary for completed and approved milestones.
         </p>

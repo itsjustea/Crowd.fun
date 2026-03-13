@@ -5,7 +5,7 @@ import { formatEther } from 'viem';
 import type { Address, Abi } from 'viem';
 import { useCampaignDetails } from '@/hooks/UseCampaignDetails';
 import { toast } from 'sonner';
-import { useRouter } from 'next/router';
+import { getGasParameters } from '../lib/gas';
 
 interface ContributorGovernanceProps {
   campaignAddress: Address;
@@ -24,8 +24,7 @@ export default function ContributorGovernance({
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { address } = useAccount();
-  const router = useRouter();
-
+  
   // Use the enhanced hook
   const {
     campaign,
@@ -42,7 +41,7 @@ export default function ContributorGovernance({
       toast.error('Please connect your wallet');
       return;
     }
-
+    const gasParams = await getGasParameters(publicClient);
     setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
     try {
       const { request } = await publicClient.simulateContract({
@@ -51,6 +50,7 @@ export default function ContributorGovernance({
         functionName: 'completeMilestone',
         args: [BigInt(milestoneId)],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);
@@ -77,7 +77,7 @@ export default function ContributorGovernance({
       toast.error('Please connect your wallet');
       return;
     }
-
+    const gasParams = await getGasParameters(publicClient);
     setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
     try {
       const { request } = await publicClient.simulateContract({
@@ -86,6 +86,7 @@ export default function ContributorGovernance({
         functionName: 'voteOnMilestone',
         args: [BigInt(milestoneId), support],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);
@@ -109,7 +110,7 @@ export default function ContributorGovernance({
       toast.error('Please connect your wallet');
       return;
     }
-
+    const gasParams = await getGasParameters(publicClient);
     setVotingInProgress(prev => ({ ...prev, [milestoneId]: true }));
     try {
       const { request } = await publicClient.simulateContract({
@@ -118,6 +119,7 @@ export default function ContributorGovernance({
         functionName: 'resolveMilestoneVote',
         args: [BigInt(milestoneId)],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);
@@ -431,7 +433,7 @@ export default function ContributorGovernance({
       {/* Governance Summary */}
       {milestones.length > 0 && (
         <div className="mt-6 bg-blue-900/20 border border-blue-700 rounded-lg p-4">
-          <div className="text-blue-300 font-semibold mb-2">📋 Governance Summary</div>
+          <div className="text-blue-300 font-semibold mb-2">Governance Summary</div>
           <div className="text-sm text-blue-200 space-y-1">
             <div>Total Milestones: {milestones.length}</div>
             <div>

@@ -6,6 +6,7 @@ import type { Address, Abi } from 'viem';
 import { useCrowdfundFactory } from '@/hooks/UseCrowdfundFactory';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { getGasParameters } from '@/lib/gas';
 
 interface Milestone {
   description: string;
@@ -100,6 +101,7 @@ export default function CreateCampaignModal({
   };
 
   const handleCreate = async (): Promise<void> => {
+    const gasParams = await getGasParameters(publicClient);
     setIsCreating(true);
     try {
       if (!publicClient || !walletClient || !address) {
@@ -107,7 +109,7 @@ export default function CreateCampaignModal({
         return;
       }
 
-      // FIXED: Prepare milestone data properly - always return a valid array
+      // Prepare milestone data properly - always return a valid array
       let milestoneData: Array<{ description: string; amount: bigint }> = [];
       
       if (useMilestones && milestones && milestones.length > 0) {
@@ -148,6 +150,7 @@ export default function CreateCampaignModal({
           enableGovernance
         ],
         account: address,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);

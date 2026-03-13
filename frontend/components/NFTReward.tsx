@@ -7,6 +7,7 @@ import { formatEther, Address, Abi } from 'viem';
 import { CROWDFUND_ABI } from '@/constants/abi';
 import { NFT_CONTRACT_ABI } from '@/constants/nft-abi';
 import { toast } from 'sonner';
+import { getGasParameters } from '@/lib/gas';
 
 interface NFTReward {
   eligible: boolean;
@@ -144,68 +145,70 @@ export default function NFTRewards({
   };
 
     const handleClaimNFT = async (): Promise<void> => {
-    if (!walletClient || !publicClient || !userAddress) {
-      toast.error('Please connect your wallet');
-      return;
-    }
-
-    setIsClaiming(true);
-    try {
-      console.log('Claiming NFT...');
-      console.log('Campaign:', campaignAddress);
-      console.log('User:', userAddress);
-
-      try {
-        const { request } = await publicClient.simulateContract({
-          address: campaignAddress,
-          abi: CROWDFUND_ABI,
-          functionName: 'claimNFT',
-          account: userAddress,
-        });
-
-        console.log('Simulation passed, sending transaction...');
-
-        const hash = await walletClient.writeContract(request);
-        console.log('Transaction hash:', hash);
-
-        await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
-          loading: 'Claiming NFT...',
-          success: 'NFT claimed successfully!',
-          error: 'Failed to claim NFT',
-        });
-        console.log(' NFT claimed successfully!');
-
-        await fetchNFTReward();
-      } catch (simError: any) {
-        console.error('❌ Simulation failed:', simError);
-        
-        // Extract the revert reason
-        let errorMsg = 'Failed to claim NFT:\n\n';
-        
-        if (simError.message?.includes('Campaign not authorized')) {
-          errorMsg += 'Campaign not authorized in NFT contract.\n\n';
-          errorMsg += 'The campaign needs to be authorized. Contact support.';
-        } else if (simError.message?.includes('already has NFT')) {
-          errorMsg += 'You have already claimed your NFT for this campaign!';
-        } else if (simError.message?.includes('Not a contributor')) {
-          errorMsg += 'You must contribute to this campaign first.';
-        } else if (simError.message?.includes('Campaign not finalized')) {
-          errorMsg += 'Campaign must be finalized first.';
-        } else if (simError.message?.includes('Campaign not successful')) {
-          errorMsg += 'Campaign was not successful. NFTs are only for successful campaigns.';
-        } else {
-          errorMsg += simError.shortMessage || simError.message || 'Unknown error';
-        }
-        
-        toast.error(errorMsg);
-        throw simError;
+      const gasParams = await getGasParameters(publicClient);
+      if (!walletClient || !publicClient || !userAddress) {
+        toast.error('Please connect your wallet');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Full error object:', error);
-    } finally {
-      setIsClaiming(false);
-    }
-  };
+
+      setIsClaiming(true);
+      try {
+        console.log('Claiming NFT...');
+        console.log('Campaign:', campaignAddress);
+        console.log('User:', userAddress);
+
+        try {
+          const { request } = await publicClient.simulateContract({
+            address: campaignAddress,
+            abi: CROWDFUND_ABI,
+            functionName: 'claimNFT',
+            account: userAddress,
+            ...gasParams
+          });
+
+          console.log('Simulation passed, sending transaction...');
+
+          const hash = await walletClient.writeContract(request);
+          console.log('Transaction hash:', hash);
+
+          await toast.promise(publicClient.waitForTransactionReceipt({ hash }), {
+            loading: 'Claiming NFT...',
+            success: 'NFT claimed successfully!',
+            error: 'Failed to claim NFT',
+          });
+          console.log(' NFT claimed successfully!');
+
+          await fetchNFTReward();
+        } catch (simError: any) {
+          console.error('❌ Simulation failed:', simError);
+          
+          // Extract the revert reason
+          let errorMsg = 'Failed to claim NFT:\n\n';
+          
+          if (simError.message?.includes('Campaign not authorized')) {
+            errorMsg += 'Campaign not authorized in NFT contract.\n\n';
+            errorMsg += 'The campaign needs to be authorized. Contact support.';
+          } else if (simError.message?.includes('already has NFT')) {
+            errorMsg += 'You have already claimed your NFT for this campaign!';
+          } else if (simError.message?.includes('Not a contributor')) {
+            errorMsg += 'You must contribute to this campaign first.';
+          } else if (simError.message?.includes('Campaign not finalized')) {
+            errorMsg += 'Campaign must be finalized first.';
+          } else if (simError.message?.includes('Campaign not successful')) {
+            errorMsg += 'Campaign was not successful. NFTs are only for successful campaigns.';
+          } else {
+            errorMsg += simError.shortMessage || simError.message || 'Unknown error';
+          }
+          
+          toast.error(errorMsg);
+          throw simError;
+        }
+      } catch (error: any) {
+        console.error('❌ Full error object:', error);
+      } finally {
+        setIsClaiming(false);
+      }
+    };
   const formatDate = (timestamp: number): string => {
     return new Date(timestamp * 1000).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -260,7 +263,7 @@ export default function NFTRewards({
       </div>
     );
   }
-
+  
   return (
     <div className="mt-8">
       <div className="mb-6">
@@ -291,7 +294,6 @@ export default function NFTRewards({
       {nftReward.eligible && !nftReward.minted && (
         <div className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-xl p-8 backdrop-blur-sm">
           <div className="text-center py-8">
-            <div className="text-8xl mb-6">🎁</div>
             <h3 className="text-3xl font-semibold text-green-300 mb-3">NFT Ready to Claim!</h3>
             <p className="text-green-200 text-lg mb-6 max-w-md mx-auto">
               Your Proof of Contribution NFT is ready. Click below to mint it to your wallet permanently on-chain.
@@ -417,33 +419,26 @@ export default function NFTRewards({
       )}
 
       {/* Minted but Metadata Loading Failed */}
-      {nftReward.eligible && nftReward.minted && !nftMetadata && (
+      {nftReward.eligible && nftReward.minted && (
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <div className="text-center py-8">
-            <div className="text-6xl mb-4">✅</div>
             <h3 className="text-xl font-semibold text-white mb-2">NFT Minted!</h3>
             <p className="text-gray-400 mb-4">
               Token ID: {nftReward.tokenId.toString()}
+              
             </p>
-            <p className="text-gray-500 text-sm mb-4">
-              Metadata is loading...
+            <p className="text-gray-400 mb-4">
+              NFT Contract Address: {nftContractAddress}
             </p>
             <div className="flex gap-3 justify-center">
-              <button
-                onClick={fetchNFTReward}
-                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                🔄 Retry
-              </button>
               <a
                 href={`https://sepolia.arbiscan.io/nft/${nftContractAddress}/${nftReward.tokenId.toString()}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white/70 text-sm font-semibold transition-all disabled:opacity-50"
               >
-                <span>🔍</span>
-                View on Arbiscan
-                <span>↗</span>
+                View Proof of Contribution on-chain 
+                <span> ↗</span>
               </a>
             </div>
           </div>

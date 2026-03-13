@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
 import { parseEther, Address } from 'viem';
+import { getGasParameters } from '@/lib/gas';
 
 // Factory contract address - update this after deployment
 const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS || '') as Address;
@@ -270,6 +271,7 @@ export function useCrowdfundFactory() {
   };
 
   const createCampaign = async (params: CreateCampaignParams): Promise<Address> => {
+    const gasParams = await getGasParameters(publicClient);
     if (!FACTORY_ADDRESS) {
       throw new Error('Factory address not configured');
     }
@@ -288,7 +290,6 @@ export function useCrowdfundFactory() {
 
     const beneficiaryAddress = params.beneficiary || userAddress;
 
-    // Simulate the contract call first
     const { request } = await publicClient.simulateContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
@@ -303,6 +304,7 @@ export function useCrowdfundFactory() {
         params.enableGovernance ?? false
       ],
       account: userAddress,
+      ...gasParams
     });
 
     // Execute the transaction

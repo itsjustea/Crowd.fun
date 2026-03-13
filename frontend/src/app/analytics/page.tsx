@@ -233,7 +233,7 @@ export default function AnalyticsPage() {
         <div className="mb-16">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-4xl font-light tracking-tight">
-              Top <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">Campaigns</span>
+              Successful <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">Campaigns</span>
             </h2>
             
             {/* Filter Tabs */}
@@ -248,7 +248,7 @@ export default function AnalyticsPage() {
                       : 'text-white/60 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  {f === 'raised' ? '💰 Highest Raised' : f === 'contributors' ? '👥 Most Contributors' : '🆕 Recent'}
+                  {f === 'raised' ? 'Highest Raised' : f === 'contributors' ? 'Most Contributors' : 'Recent'}
                 </button>
               ))}
             </div>
@@ -323,7 +323,7 @@ export default function AnalyticsPage() {
 
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-sm text-white/90 mb-1">
-                      {contributor.address.slice(0, 8)}...{contributor.address.slice(-6)}
+                      {contributor.address.slice(0, 6)}...{contributor.address.slice(-4)}
                     </div>
                     <div className="text-xs text-white/40">
                       Supported {contributor.campaignsSupported} campaign{contributor.campaignsSupported !== 1 ? 's' : ''}

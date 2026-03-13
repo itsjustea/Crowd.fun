@@ -4,9 +4,10 @@
   import { parseEther } from 'viem';
   import type { Address } from 'viem';
   import Link from 'next/link';
-  import { useWalletClient, usePublicClient } from 'wagmi';
+  import { useWalletClient, usePublicClient, useAccount } from 'wagmi';
   import { toast } from 'sonner';
   import { useRouter } from 'next/navigation';
+  import { getGasParameters } from '@/lib/gas';
 
   interface Campaign {
     address: Address;
@@ -43,6 +44,7 @@
 
     const { data: walletClient } = useWalletClient();
     const publicClient = usePublicClient();
+    const { address } = useAccount();
 
     const raised = Number(campaign.totalRaised) / 1e18;
     const goal = Number(campaign.fundingCap) / 1e18;
@@ -105,6 +107,7 @@
     const isCreator = account?.toLowerCase() === campaign.creator?.toLowerCase();
 
     const handleContribute = async () => {
+      const gasParams = await getGasParameters(publicClient);
       if (!contributionAmount || parseFloat(contributionAmount) <= 0) {
         toast.error('Please enter a valid contribution amount');
         return;
@@ -120,12 +123,16 @@
 
         console.log('Contributing', contributionAmount, 'ETH to', campaignAddress);
 
-        const hash = await walletClient.writeContract({
+        const { request } = await publicClient.simulateContract({
           address: campaignAddress,
           abi: CROWDFUND_ABI,
           functionName: 'contribute',
           value: parseEther(contributionAmount),
+          account: address,
+          ...gasParams
         });
+
+        const hash = await walletClient.writeContract(request);
 
         console.log('Transaction hash:', hash);
         console.log('Waiting for confirmation...');
@@ -150,7 +157,7 @@
       } finally {
         setIsContributing(false);
       }
-      };
+    };
 
     // Status badge configuration
     const statusConfig = {
@@ -230,7 +237,7 @@
                 {progress.toFixed(0)}%
               </span>
               <span className="text-xs text-white/50 uppercase tracking-wide font-semibold">
-                of {goal.toFixed(2)} ETH
+                of {goal.toFixed(5)} ETH
               </span>
             </div>
           </div>
@@ -248,7 +255,7 @@
 
         {/* Contribute Section */}
         {isActive && account && !isCreator && !isFullyFunded && (
-          <div className="flex gap-3">
+          <div className="flex gap-1">
             <input
               type="number"
               step="0.01"

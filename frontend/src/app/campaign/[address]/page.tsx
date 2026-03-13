@@ -4,7 +4,7 @@
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { usePublicClient, useWalletClient, useAccount } from 'wagmi';
-import { formatEther } from 'viem';
+import { parseEther,formatEther } from 'viem';
 import type { Address, Abi } from 'viem';
 import CampaignUpdates from '@/components/CampaignUpdates';
 import ContributorGovernance from '@/components/ContributorGovernance';
@@ -15,6 +15,8 @@ import NFTReward from '@/components/NFTReward';
 import { FACTORY_ABI } from '@/hooks/UseCrowdfundFactory';
 import NFTRewards from '@/components/NFTReward';
 import { toast } from 'sonner';
+import { getGasParameters } from '@/lib/gas';
+
 
 // ---------------------------------------------------------------------------
 // WithdrawFunds — inline component for no-milestone successful campaigns
@@ -41,6 +43,7 @@ function WithdrawFunds({
   const { data: walletClient } = useWalletClient();
   const { address: userAddress } = useAccount();
 
+
   // On mount, check whether funds have already been withdrawn
   useEffect(() => {
     const check = async () => {
@@ -62,6 +65,7 @@ function WithdrawFunds({
   }, [campaignAddress, publicClient]);
 
   const handleWithdraw = async () => {
+    const gasParams = await getGasParameters(publicClient);
     if (!publicClient || !walletClient || !userAddress) {
       toast.error('Please connect your wallet');
       return;
@@ -74,6 +78,7 @@ function WithdrawFunds({
         abi: CROWDFUND_ABI,
         functionName: 'withdrawFunds',
         account: userAddress,
+        ...gasParams
       });
 
       const hash = await walletClient.writeContract(request);
@@ -111,7 +116,7 @@ function WithdrawFunds({
   if (withdrawn) {
     return (
       <div className="bg-green-900/30 border border-green-700 rounded-xl p-6">
-        <p className="text-green-300 font-semibold mb-1">✅ Funds Withdrawn</p>
+        <p className="text-green-300 font-semibold mb-1">Funds Withdrawn</p>
         <p className="text-green-200 text-sm">
           All funds have been sent to the beneficiary address.
         </p>
@@ -163,7 +168,7 @@ function WithdrawFunds({
             Withdrawing…
           </>
         ) : (
-          <>💰 Withdraw Funds</>
+          <>Withdraw Funds</>
         )}
       </button>
     </div>
@@ -189,7 +194,7 @@ interface CampaignData {
   nftRewardsEnabled: boolean;
   userContribution: bigint;
   nftContractAddress: Address|null; 
-}
+  fundsWithdrawn: boolean;}
 
 type TabType = 'overview' | 'updates' | 'governance' | 'milestone-funds' | 'funds' | 'nft-rewards';
 
@@ -201,6 +206,8 @@ export default function CampaignDetails() {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isFinalizing, setIsFinalizing] = useState<boolean>(false);
+  const [contributionAmount, setContributionAmount] = useState<string>('');
+  const [isContributing, setIsContributing] = useState<boolean>(false);
 
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
@@ -235,8 +242,24 @@ export default function CampaignDetails() {
         bigint,
         boolean,
         boolean,
-        bigint
+        bigint,
+        boolean
       ];
+
+      const fundsWithdrawn = await publicClient.readContract({
+      address: campaignAddress,
+      abi: [
+        {
+          type: 'function',
+          name: 'fundsWithdrawn',
+          inputs: [],
+          outputs: [{ type: 'bool' }],
+          stateMutability: 'view',
+        },
+      ],
+      functionName: 'fundsWithdrawn',
+    }) as boolean;
+    console.log('Funds withdrawn status:', fundsWithdrawn);
 
       let userContribution = BigInt(0);
       if (userAddress) {
@@ -248,7 +271,7 @@ export default function CampaignDetails() {
         })) as bigint;
       }
 
-      // Option 2: Read from campaign contract directly
+      // Read from campaign contract directly
       let nftContractAddress: Address | null = null;
       if (details[10]) { // if nftRewardsEnabled
         try {
@@ -289,7 +312,8 @@ export default function CampaignDetails() {
         nftRewardsEnabled: Boolean(details[10]),
         updateCount: Number(details[11]),
         userContribution,
-        nftContractAddress
+        nftContractAddress,
+        fundsWithdrawn // Optional: only set if available from contract
       });
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -340,6 +364,59 @@ export default function CampaignDetails() {
       toast.error('Failed to finalize campaign: ' + errorMessage);
     } finally {
       setIsFinalizing(false);
+    }
+  };
+
+  const handleContribute = async () => {
+    const gasParams = await getGasParameters(publicClient);
+    if (!contributionAmount || parseFloat(contributionAmount) <= 0) {
+      toast.error('Please enter a valid contribution amount');
+      return;
+    }
+
+    if (!walletClient || !publicClient) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    try {
+      setIsContributing(true);
+
+      console.log('Contributing', contributionAmount, 'ETH to', campaignAddress);
+
+      const { request } = await publicClient.simulateContract({
+        address: campaignAddress,
+        abi: CROWDFUND_ABI,
+        functionName: 'contribute',
+        value: parseEther(contributionAmount),
+        account: userAddress,
+        ...gasParams
+      });
+
+      const hash = await walletClient.writeContract(request);
+
+      console.log('Transaction hash:', hash);
+      console.log('Waiting for confirmation...');
+
+      await toast.promise(
+        publicClient.waitForTransactionReceipt({ hash }),
+        {
+          loading: 'Processing contribution...',
+          success: 'Contribution successful!',
+          error: 'Failed to contribute',
+        }
+      );
+
+      setContributionAmount('');
+      
+      // Reload page to refresh campaign data
+      // window.location.reload();   
+      await fetchCampaignData(); // Refresh campaign data without full reload 
+      
+    } catch (error: any) {
+      console.error('Contribution error:', error);
+    } finally {
+      setIsContributing(false);
     }
   };
 
@@ -480,6 +557,7 @@ export default function CampaignDetails() {
       console.log('═══════════════════════════════════════');
     }
   };
+  
 
   // -----------------------------------------------------------------------
   // Render
@@ -500,7 +578,7 @@ export default function CampaignDetails() {
               <h1 className="text-3xl font-bold text-white mb-2">{campaign.name}</h1>
               {isCreator && (
                 <span className="inline-block px-3 py-1 bg-purple-900/50 text-purple-300 text-sm rounded-full border border-purple-700">
-                  👑 Your Campaign
+                  Your Campaign
                 </span>
               )}
             </div>
@@ -553,7 +631,7 @@ export default function CampaignDetails() {
             <div className="bg-gray-900/50 rounded-lg p-4">
               <div className="text-gray-400 text-sm">Governance</div>
               <div className="text-white font-semibold mt-1">
-                {campaign.governanceEnabled ? '🗳️ Enabled' : '❌ Disabled'}
+                {campaign.governanceEnabled ? 'Enabled' : 'Disabled'}
               </div>
             </div>
           </div>
@@ -568,12 +646,66 @@ export default function CampaignDetails() {
             </div>
           )}
 
+          {!campaign.finalized && userAddress && !isCreator && fundingPercentage < 100 && (
+            <div className="mt-6">
+              <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-indigo-700/50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  Contribute to this Campaign
+                </h3>
+                <div className="flex gap-3">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount (ETH)"
+                    value={contributionAmount}
+                    onChange={(e) => setContributionAmount(e.target.value)}
+                    disabled={isContributing}
+                    className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 font-mono focus:outline-none focus:border-indigo-500/50 focus:bg-white/8 focus:ring-3 focus:ring-indigo-500/10 transition-all"
+                  />
+                  <button
+                    onClick={handleContribute}
+                    disabled={isContributing || !contributionAmount || parseFloat(contributionAmount) <= 0}
+                    className="
+                      shrink-0
+                      px-6 py-3
+                      text-sm font-semibold text-white
+                      bg-gradient-to-r from-indigo-600 to-purple-600
+                      rounded-xl whitespace-nowrap
+                      hover:-translate-y-0.5
+                      hover:shadow-[0_6px_20px_rgba(99,102,241,0.4)]
+                      transition-all duration-200
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      disabled:hover:translate-y-0
+                      disabled:hover:shadow-none
+                    "
+                  >
+                    {isContributing ? 'Contributing...' : 'Contribute'}
+                  </button>
+                </div>
+                {contributionAmount && parseFloat(contributionAmount) > 0 && (
+                  <div className="mt-3 text-sm text-gray-400">
+                    Contributing {contributionAmount} ETH will bring the campaign to{' '}
+                    <span className="text-indigo-400 font-semibold">
+                      {Math.min(
+                        100,
+                        ((Number(formatEther(campaign.totalFundsRaised)) + parseFloat(contributionAmount)) /
+                          Number(formatEther(campaign.fundingCap))) *
+                          100
+                      ).toFixed(2)}
+                      %
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Finalization Button */}
           {isCreator && canFinalize && (
             <div className="mt-6 ">
               <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-4">
                 <div className="text-yellow-300 text-sm font-semibold mb-2">
-                  ⚠️ Campaign Has Ended
+                  Campaign Has Ended
                 </div>
                 <p className="text-yellow-200 text-sm">
                   This campaign needs to be finalized to determine success/failure and enable fund
@@ -591,7 +723,7 @@ export default function CampaignDetails() {
                     Finalizing...
                   </>
                 ) : (
-                  <>🏁 Finalize Campaign</>
+                  <>Finalize Campaign</>
                 )}
               </button>
             </div>
@@ -659,7 +791,7 @@ export default function CampaignDetails() {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              🗳️ Governance
+              Governance
             </button>
           )}
 
@@ -673,7 +805,7 @@ export default function CampaignDetails() {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              💰 Funds
+              Funds
             </button>
           )}
 
@@ -687,7 +819,7 @@ export default function CampaignDetails() {
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
-              💰 Funds
+              Funds
             </button>
           )}
 
@@ -751,11 +883,28 @@ export default function CampaignDetails() {
                 <div>
                   <div className="text-gray-400 text-sm">Campaign Status</div>
                   <div className="text-white mt-1">
-                    {campaign.finalized
-                      ? campaign.successful
-                        ? '✅ Campaign succeeded - Funds in escrow'
-                        : '❌ Campaign failed - Refunds available'
-                      : '🔄 Campaign active - Accepting contributions'}
+                    {!campaign.finalized ? (
+                      // Campaign is still active
+                      'Campaign Active - Accepting Contributions'
+                    ) : campaign.successful ? (
+                      // Campaign succeeded
+                      campaign.fundsWithdrawn ? (
+                        // Funds have been withdrawn
+                        <span className="text-green-400">
+                          Campaign Succeeded - Funds Withdrawn
+                        </span>
+                      ) : (
+                        // Funds still in escrow
+                        <span className="text-blue-400">
+                          Campaign Succeeded - Funds in Escrow
+                        </span>
+                      )
+                    ) : (
+                      // Campaign failed
+                      <span className="text-red-400">
+                        Campaign Failed - Refunds Available
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

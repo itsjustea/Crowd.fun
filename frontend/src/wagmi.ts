@@ -1,4 +1,6 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { http } from 'wagmi';
+
 import {
   arbitrumSepolia
 } from 'wagmi/chains';
@@ -21,4 +23,7 @@ export const config = getDefaultConfig({
       ],
     },
   ],
+  transports: {
+    [arbitrumSepolia.id]: http(), 
+  },
 });

@@ -104,11 +104,11 @@ export default function Dashboard() {
     if (campaign.finalized) {
       return campaign.successful ? (
         <span className="px-3 py-1 bg-green-900/30 text-green-400 border border-green-700 rounded-full text-sm font-medium">
-          ✅ Successful
+          Successful
         </span>
       ) : (
         <span className="px-3 py-1 bg-red-900/30 text-red-400 border border-red-700 rounded-full text-sm font-medium">
-          ❌ Failed
+          Failed
         </span>
       );
     }
@@ -116,7 +116,7 @@ export default function Dashboard() {
     if (now > deadline) {
       return (
         <span className="px-3 py-1 bg-yellow-900/30 text-yellow-400 border border-yellow-700 rounded-full text-sm font-medium">
-          ⏰ Ended (Pending Finalization)
+          Ended (Pending Finalization)
         </span>
       );
     }
@@ -207,7 +207,7 @@ export default function Dashboard() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
-            📊 My Campaign Dashboard
+            My Campaign Dashboard
           </h1>
           <p className="text-gray-400">
             Manage and track all your crowdfunding campaigns
@@ -220,7 +220,7 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 border border-blue-700 rounded-xl p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-blue-300 text-sm font-medium">Total Campaigns</h3>
-              <span className="text-3xl">📋</span>
+              
             </div>
             <p className="text-4xl font-bold text-white">{stats.totalCampaigns}</p>
           </div>
@@ -229,10 +229,10 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 border border-green-700 rounded-xl p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-green-300 text-sm font-medium">Total Raised</h3>
-              <span className="text-3xl">💰</span>
+              
             </div>
             <p className="text-4xl font-bold text-white">
-              {formatEther(stats.totalRaised).slice(0, 8)}
+              {formatEther(stats.totalRaised).slice(0, 8)} 
             </p>
             <p className="text-green-400 text-sm mt-1">ETH</p>
           </div>
@@ -241,7 +241,7 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 border border-purple-700 rounded-xl p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-purple-300 text-sm font-medium">Active Campaigns</h3>
-              <span className="text-3xl">🟢</span>
+              
             </div>
             <p className="text-4xl font-bold text-white">{stats.activeCampaigns}</p>
           </div>
@@ -250,7 +250,7 @@ export default function Dashboard() {
           <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 border border-yellow-700 rounded-xl p-6 backdrop-blur-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-yellow-300 text-sm font-medium">Successful</h3>
-              <span className="text-3xl">✅</span>
+              
             </div>
             <p className="text-4xl font-bold text-white">{stats.successfulCampaigns}</p>
           </div>
@@ -311,14 +311,14 @@ export default function Dashboard() {
                       </div>
 
                       <div className="flex flex-wrap gap-4 text-sm text-gray-400">
-                        <span>📅 Deadline: {formatDeadline(campaign.deadline)}</span>
+                        <span>Deadline: {formatDeadline(campaign.deadline)}</span>
                         <span>
-                          🎯 Goal: {formatEther(BigInt(campaign.fundingCap))} ETH
+                          Goal: {formatEther(BigInt(campaign.fundingCap))} ETH
                         </span>
                         <span>
-                          👥 {campaign.contributorCount} contributor{campaign.contributorCount !== 1 ? 's' : ''}
+                          {campaign.contributorCount} contributor{campaign.contributorCount !== 1 ? 's' : ''}
                         </span>
-                        <span className="text-gray-500 font-mono text-xs">
+                        <span className="text-gray-500 font-mono">
                           {campaign.address.slice(0, 6)}...{campaign.address.slice(-4)}
                         </span>
                       </div>
