@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './api/routes';
 import analyticsRoutes from './api/analytics';
+import { startIndexer } from './indexer/index-ws';
 
 dotenv.config();
 
@@ -24,8 +25,16 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API server running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log('Platform Analytics: http://localhost:${PORT}/api/analytics/platform');
+
+  try {
+    await startIndexer();
+  } catch (error) {
+    console.error('❌ Failed to start indexer:', error);
+  }
+
+
 });

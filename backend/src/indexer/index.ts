@@ -1,5 +1,4 @@
-// src/indexer/index.ts - Polling-based approach (no event listeners for factory)
-
+// src/indexer/index.ts -
 import dotenv from 'dotenv';
 import { ethers } from 'ethers';
 import { PrismaClient } from '@prisma/client';

@@ -5,6 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",
+    "dev:ws": "nodemon src/indexer/index-ws.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\"",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
@@ -28,6 +30,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "@types/ws": "^8.5.10",
+    "concurrently": "^9.2.1",
     "nodemon": "^3.0.2",
     "prisma": "^5.7.0",
     "ts-node": "^10.9.2",
